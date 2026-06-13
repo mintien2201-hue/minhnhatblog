@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phạm Minh Nhật - Tattoo Artist</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Oswald:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="noise-overlay"></div>
+
+    <header class="header">
+        <div class="header-bg"></div>
+        <div class="header-content">
+            <div class="avatar-frame">
+                <img src="558972001_18037505717700444_8005351031345878983_n.jpg" alt="Phạm Minh Nhật" class="avatar" loading="eager">
+                <div class="avatar-ring"></div>
+            </div>
+            <h1 class="artist-name" contenteditable="false" data-field="name">Nhập tên của bạn</h1>
+            <p class="artist-title" contenteditable="false" data-field="title">Nghề nghiệp của bạn</p>
+            <p class="artist-tagline" contenteditable="false" data-field="tagline">"Câu nói yêu thích của bạn"</p>
+        </div>
+        <nav class="main-nav">
+            <a href="#ve-toi">Về Tôi</a>
+            <a href="#tac-pham">Tác Phẩm</a>
+            <a href="#blog">Chuyện Xăm</a>
+            <a href="#lien-he">Liên Hệ</a>
+        </nav>
+    </header>
+
+    <section class="about-section" id="ve-toi">
+        <div class="container">
+            <div class="about-layout">
+                <div class="about-text">
+                    <div class="section-header">
+                        <h2 class="section-title">Về Tôi</h2>
+                    </div>
+                    <div class="text-block">
+                        <p contenteditable="false" data-field="about1">Giới thiệu về bản thân bạn. Hãy click vào đây để viết những dòng đầu tiên...</p>
+                        <p contenteditable="false" data-field="about2">Bạn có thể thêm nhiều đoạn văn khác, chia sẻ về công việc, đam mê và câu chuyện của mình.</p>
+                        <div class="stats">
+                            <div class="stat-item">
+                                <span class="stat-number" contenteditable="false" data-field="stat1_num">0</span>
+                                <span class="stat-label" contenteditable="false" data-field="stat1_label">Danh mục 1</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-number" contenteditable="false" data-field="stat2_num">0</span>
+                                <span class="stat-label" contenteditable="false" data-field="stat2_label">Danh mục 2</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-number" contenteditable="false" data-field="stat3_num">0</span>
+                                <span class="stat-label" contenteditable="false" data-field="stat3_label">Danh mục 3</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="gallery-section" id="tac-pham">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Tác Phẩm</h2>
+                <p class="section-subtitle">Mỗi đường kim là một câu chuyện</p>
+            </div>
+            <div class="gallery-grid" id="gallery-grid"></div>
+        </div>
+    </section>
+
+    <section class="blog-section" id="blog">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Chuyện Xăm</h2>
+                <p class="section-subtitle">Góc nhìn về nghệ thuật trên da</p>
+            </div>
+            <div class="blog-grid" id="blog-grid"></div>
+        </div>
+    </section>
+
+    <section class="quote-section">
+        <div class="container">
+            <blockquote class="quote-block">
+                <p contenteditable="false" data-field="quote_text">"Câu trích dẫn yêu thích của bạn"</p>
+                <cite contenteditable="false" data-field="quote_author">— Tên của bạn</cite>
+            </blockquote>
+        </div>
+    </section>
+
+    <section class="contact-section" id="lien-he">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Liên Hệ</h2>
+            </div>
+            <div class="contact-info">
+                <div class="contact-item">
+                    <span class="contact-icon">📍</span>
+                    <span contenteditable="false" data-field="contact_address">Địa chỉ của bạn</span>
+                </div>
+                <div class="contact-item">
+                    <span class="contact-icon">📱</span>
+                    <span contenteditable="false" data-field="contact_phone">Số điện thoại</span>
+                </div>
+                <div class="contact-item">
+                    <span class="contact-icon">📧</span>
+                    <span contenteditable="false" data-field="contact_email">Email của bạn</span>
+                </div>
+                <div class="contact-item">
+                    <span class="contact-icon">📸</span>
+                    <span contenteditable="false" data-field="contact_instagram">@instagram_cua_ban</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="footer">
+        <div class="container">
+            <p contenteditable="false" data-field="footer_text">© 2026 Tên của bạn</p>
+            <p class="footer-credit" contenteditable="false" data-field="footer_slogan">Câu slogan của bạn</p>
+        </div>
+    </footer>
+
+    <input type="file" id="fileInput" accept="image/*" hidden>
+
+    <button class="edit-toggle" id="editToggle" title="Chỉnh sửa">🔒</button>
+
+    <div class="publish-bar" id="publishBar">
+        <span class="publish-status" id="publishStatus"></span>
+        <button class="publish-btn" id="publishBtn">Xuất bản lên GitHub</button>
+    </div>
+
+    <div class="password-modal" id="passwordModal">
+        <div class="password-box">
+            <h3>Nhập mật khẩu để chỉnh sửa</h3>
+            <input type="password" id="passwordInput" placeholder="Mật khẩu..." autocomplete="off">
+            <div class="password-buttons">
+                <button id="passwordConfirm">Xác nhận</button>
+                <button id="passwordCancel">Huỷ</button>
+            </div>
+            <p class="password-error" id="passwordError">Sai mật khẩu!</p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
