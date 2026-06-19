@@ -450,7 +450,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const body = {
             message: `Cập nhật ${path} từ blog`,
             content: btoa(unescape(encodeURIComponent(content))),
-            branch: 'master'
+            branch: 'main'
         };
         if (sha) body.sha = sha;
 
@@ -480,7 +480,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const body = {
             message: `Thêm ảnh ${name}`,
             content: base64,
-            branch: 'master'
+            branch: 'main'
         };
 
         const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
@@ -498,7 +498,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const data = await res.json();
-        return data.content.download_url || `https://raw.githubusercontent.com/${repo}/master/${path}`;
+        return data.content.download_url || `https://raw.githubusercontent.com/${repo}/main/${path}`;
     }
 
     // =====================
