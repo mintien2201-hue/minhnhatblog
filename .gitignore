@@ -2,3 +2,28 @@ node_modules/
 .DS_Store
 Thumbs.db
 *.log
+
+# Backup và file nhạy cảm
+*.backup
+*.bak
+*.tmp
+.env
+.env.local
+config.local.js
+secrets.json
+
+# File chứa token (nếu ai đó tạo nhầm)
+*token*.txt
+*password*.txt
+*secret*.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

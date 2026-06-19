@@ -288,18 +288,101 @@ document.addEventListener('DOMContentLoaded', function() {
     // PUBLISH TO GITHUB
     // =====================
     publishBtn.addEventListener('click', publishToGitHub);
+    
+    const settingsBtn = document.getElementById('settingsBtn');
+    settingsBtn.addEventListener('click', showSecuritySettings);
+
+    function showSecuritySettings() {
+        const token = localStorage.getItem(GH_TOKEN_KEY);
+        const repo = localStorage.getItem(GH_REPO_KEY);
+        const alwaysAsk = localStorage.getItem('blog_always_ask_token') === 'true';
+        
+        let msg = 'CÀI ĐẶT BẢO MẬT\n\n';
+        
+        if (token && repo) {
+            msg += `Repo hiện tại: ${repo}\n`;
+            msg += `Token: ${token.substring(0, 8)}...${token.substring(token.length - 4)}\n`;
+            msg += `Chế độ: ${alwaysAsk ? 'Nhập token mỗi lần' : 'Lưu token'}\n\n`;
+            msg += 'Chọn:\n';
+            msg += '1. Xóa token (khuyến nghị khi không dùng)\n';
+            msg += '2. Nhập lại token mới\n';
+            msg += `3. ${alwaysAsk ? 'Tắt' : 'Bật'} chế độ nhập token mỗi lần (an toàn hơn)\n`;
+            msg += '4. Hủy';
+            
+            const choice = prompt(msg);
+            
+            if (choice === '1') {
+                if (confirm('Xóa token và repo khỏi trình duyệt?')) {
+                    localStorage.removeItem(GH_TOKEN_KEY);
+                    localStorage.removeItem(GH_REPO_KEY);
+                    alert('Đã xóa token. Lần xuất bản tiếp theo sẽ yêu cầu nhập lại.');
+                }
+            } else if (choice === '2') {
+                localStorage.removeItem(GH_TOKEN_KEY);
+                localStorage.removeItem(GH_REPO_KEY);
+                alert('Đã xóa token cũ. Click "Xuất bản lên GitHub" để nhập token mới.');
+            } else if (choice === '3') {
+                const newValue = !alwaysAsk;
+                localStorage.setItem('blog_always_ask_token', newValue.toString());
+                if (newValue) {
+                    localStorage.removeItem(GH_TOKEN_KEY);
+                    alert('Đã bật chế độ nhập token mỗi lần.\nToken sẽ KHÔNG được lưu trong trình duyệt.');
+                } else {
+                    alert('Đã tắt chế độ nhập token mỗi lần.\nToken sẽ được lưu để dùng lại.');
+                }
+            }
+        } else {
+            msg += 'Chưa có token được lưu.\n\n';
+            msg += 'Chọn:\n';
+            msg += `1. ${alwaysAsk ? 'Tắt' : 'Bật'} chế độ nhập token mỗi lần\n`;
+            msg += '2. Hủy';
+            
+            const choice = prompt(msg);
+            
+            if (choice === '1') {
+                const newValue = !alwaysAsk;
+                localStorage.setItem('blog_always_ask_token', newValue.toString());
+                alert(newValue ? 
+                    'Đã bật chế độ nhập token mỗi lần (an toàn hơn).' : 
+                    'Đã tắt chế độ nhập token mỗi lần.');
+            }
+        }
+    }
 
     async function publishToGitHub() {
         let token = localStorage.getItem(GH_TOKEN_KEY);
         let repo = localStorage.getItem(GH_REPO_KEY);
 
-        if (!token || !repo) {
-            token = prompt('Nhập GitHub Personal Access Token (cần quyền repo):');
+        // Tùy chọn: Nhập token mỗi lần (an toàn hơn)
+        const alwaysAsk = localStorage.getItem('blog_always_ask_token') === 'true';
+
+        if (!token || !repo || alwaysAsk) {
+            if (!alwaysAsk) {
+                const warning = 'CẢNH BÁO BẢO MẬT:\n\n' +
+                    '• Token sẽ được lưu trong trình duyệt của bạn\n' +
+                    '• KHÔNG chia sẻ token với ai\n' +
+                    '• KHÔNG commit token vào code\n' +
+                    '• Nhấn nút ⚙️ ở góc dưới để xóa token khi không dùng\n\n' +
+                    'Tiếp tục?';
+                
+                if (!confirm(warning)) return;
+            }
+            
+            token = prompt('Nhập GitHub Personal Access Token (cần quyền repo):\n\nĐể tạo token:\n1. GitHub → Settings → Developer settings\n2. Personal access tokens → Tokens (classic)\n3. Generate new token → chọn scope "repo"');
             if (!token) return;
-            repo = prompt('Nhập tên repo (vd: username/repo):');
-            if (!repo) return;
-            localStorage.setItem(GH_TOKEN_KEY, token);
-            localStorage.setItem(GH_REPO_KEY, repo);
+            
+            if (!repo) {
+                repo = prompt('Nhập tên repo (vd: username/repo):');
+                if (!repo) return;
+            }
+            
+            if (!alwaysAsk) {
+                localStorage.setItem(GH_TOKEN_KEY, token);
+                localStorage.setItem(GH_REPO_KEY, repo);
+            } else {
+                // Chỉ lưu repo, không lưu token
+                localStorage.setItem(GH_REPO_KEY, repo);
+            }
         }
 
         publishBtn.disabled = true;
@@ -367,7 +450,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const body = {
             message: `Cập nhật ${path} từ blog`,
             content: btoa(unescape(encodeURIComponent(content))),
-            branch: 'main'
+            branch: 'master'
         };
         if (sha) body.sha = sha;
 
@@ -397,7 +480,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const body = {
             message: `Thêm ảnh ${name}`,
             content: base64,
-            branch: 'main'
+            branch: 'master'
         };
 
         const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
@@ -415,7 +498,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const data = await res.json();
-        return data.content.download_url || `https://raw.githubusercontent.com/${repo}/main/${path}`;
+        return data.content.download_url || `https://raw.githubusercontent.com/${repo}/master/${path}`;
     }
 
     // =====================
