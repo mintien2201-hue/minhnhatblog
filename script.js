@@ -398,6 +398,9 @@ document.addEventListener('DOMContentLoaded', function() {
             message: `Thêm ảnh ${name}`,
             content: base64,
             branch: 'main'
+
+
+            
         };
 
         const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
