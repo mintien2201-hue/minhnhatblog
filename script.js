@@ -249,48 +249,85 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // =====================
-    // PUBLISH VIA SERVER
+    // PUBLISH VIA GITHUB API
     // =====================
-    publishBtn.addEventListener('click', async function() {
+    const GH_TOKEN_KEY = 'blog_gh_token';
+    const GH_REPO_KEY = 'blog_gh_repo';
+
+    async function publishToGitHub() {
         publishBtn.disabled = true;
         publishStatus.textContent = 'Dang xuat ban...';
 
         try {
             saveAllToLocal();
 
+            let token = localStorage.getItem(GH_TOKEN_KEY);
+            let repo = localStorage.getItem(GH_REPO_KEY);
+
+            if (!token || !repo) {
+                token = prompt('Nhap GitHub Token (PAT):');
+                if (!token) { publishBtn.disabled = false; publishStatus.textContent = ''; return; }
+                repo = prompt('Nhap ten repo (vd: username/repo):');
+                if (!repo) { publishBtn.disabled = false; publishStatus.textContent = ''; return; }
+                localStorage.setItem(GH_TOKEN_KEY, token);
+                localStorage.setItem(GH_REPO_KEY, repo);
+            }
+
             const siteData = {};
             editables.forEach(el => {
                 const f = el.dataset.field;
                 if (f) siteData[f] = el.innerHTML;
             });
-
             const galleryData = getGalleryData();
             const postsData = getBlogData();
 
-            const res = await fetch('/api/save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    site: siteData,
-                    gallery: galleryData,
-                    posts: postsData
-                })
-            });
+            await ghCommitFile(token, repo, 'content/site.json', JSON.stringify(siteData, null, 2));
+            await ghCommitFile(token, repo, 'content/gallery.json', JSON.stringify(galleryData, null, 2));
+            await ghCommitFile(token, repo, 'content/posts.json', JSON.stringify(postsData, null, 2));
 
-            const data = await res.json();
-            if (data.ok) {
-                publishStatus.textContent = data.committed ? 'Da xuat ban + commit!' : 'Da luu thanh cong!';
-            } else {
-                publishStatus.textContent = 'Loi: ' + (data.error || 'Khong xac dinh');
-            }
+            publishStatus.textContent = 'Da xuat ban thanh cong!';
             setTimeout(() => { publishStatus.textContent = ''; }, 4000);
+
         } catch (err) {
-            publishStatus.textContent = 'Loi ket noi: ' + err.message;
+            publishStatus.textContent = 'Loi: ' + err.message;
+            if (err.message.includes('401') || err.message.includes('403')) {
+                localStorage.removeItem(GH_TOKEN_KEY);
+                publishStatus.textContent = 'Token sai. Hay nhap lai.';
+            }
             console.error(err);
         }
-
         publishBtn.disabled = false;
-    });
+    }
+
+    async function ghCommitFile(token, repo, path, content) {
+        let sha = null;
+        try {
+            const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+                headers: { Authorization: 'token ' + token }
+            });
+            if (res.ok) { const d = await res.json(); sha = d.sha; }
+        } catch {}
+
+        const body = {
+            message: 'Cap nhat ' + path,
+            content: btoa(unescape(encodeURIComponent(content))),
+            branch: 'main'
+        };
+        if (sha) body.sha = sha;
+
+        const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+            method: 'PUT',
+            headers: { Authorization: 'token ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.message || 'GitHub API loi ' + res.status);
+        }
+    }
+
+    publishBtn.addEventListener('click', publishToGitHub);
 
     // =====================
     // LOAD INITIAL DATA

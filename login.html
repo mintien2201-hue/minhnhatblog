@@ -131,35 +131,23 @@
     </div>
 
     <script>
+        const PASSWORD_HASH = '123456';
         const input = document.getElementById('passwordInput');
         const btn = document.getElementById('loginBtn');
         const error = document.getElementById('loginError');
 
-        async function login() {
+        function login() {
             const password = input.value.trim();
             if (!password) return;
-            btn.disabled = true;
             error.classList.remove('show');
-            try {
-                const res = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password })
-                });
-                const data = await res.json();
-                if (data.ok) {
-                    sessionStorage.setItem('blog_logged_in', '1');
-                    window.location.href = 'index.html';
-                } else {
-                    error.classList.add('show');
-                    input.value = '';
-                    input.focus();
-                }
-            } catch {
-                error.textContent = 'Loi ket noi. Kiem tra server.';
+            if (password === PASSWORD_HASH) {
+                sessionStorage.setItem('blog_logged_in', '1');
+                window.location.href = 'index.html';
+            } else {
                 error.classList.add('show');
+                input.value = '';
+                input.focus();
             }
-            btn.disabled = false;
         }
 
         btn.addEventListener('click', login);
