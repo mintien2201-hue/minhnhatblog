@@ -125,23 +125,12 @@
 
     <input type="file" id="fileInput" accept="image/*" hidden>
 
-    <button class="edit-toggle" id="editToggle" title="Chỉnh sửa">🔒</button>
-
-    <div class="publish-bar" id="publishBar">
-        <span class="publish-status" id="publishStatus"></span>
-        <button class="publish-btn" id="publishBtn">Xuất bản lên GitHub</button>
-        <button class="settings-btn" id="settingsBtn" title="Cài đặt bảo mật">⚙️</button>
-    </div>
-
-    <div class="password-modal" id="passwordModal">
-        <div class="password-box">
-            <h3>Nhập mật khẩu để chỉnh sửa</h3>
-            <input type="password" id="passwordInput" placeholder="Mật khẩu..." autocomplete="off">
-            <div class="password-buttons">
-                <button id="passwordConfirm">Xác nhận</button>
-                <button id="passwordCancel">Huỷ</button>
-            </div>
-            <p class="password-error" id="passwordError">Sai mật khẩu!</p>
+    <div class="admin-controls" id="adminControls">
+        <button class="edit-toggle" id="editToggle" title="Chỉnh sửa">✏️</button>
+        <div class="publish-bar" id="publishBar">
+            <span class="publish-status" id="publishStatus"></span>
+            <button class="publish-btn" id="publishBtn">Xuất bản</button>
+            <button class="logout-btn" id="logoutBtn" title="Đăng xuất">↩</button>
         </div>
     </div>
 
