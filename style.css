@@ -410,6 +410,7 @@ body {
     background: rgba(0, 0, 0, 0.5);
     border-left: 2px solid var(--gold);
     width: 100%;
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
     transform: translateY(10px);
     transition: transform 0.4s ease;
@@ -707,6 +708,7 @@ body {
     position: absolute;
     inset: 0;
     background: rgba(0, 0, 0, 0.92);
+    -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
 }
 
@@ -745,6 +747,7 @@ body {
     padding: 16px 24px;
     background: rgba(0, 0, 0, 0.5);
     border-left: 3px solid var(--gold);
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
     border-radius: 2px;
     opacity: 0;
@@ -927,6 +930,7 @@ body {
     align-items: center;
     justify-content: center;
     line-height: 1;
+    -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
 }
 
@@ -957,6 +961,7 @@ body {
     align-items: center;
     justify-content: center;
     line-height: 1;
+    -webkit-backdrop-filter: blur(8px);
     backdrop-filter: blur(8px);
 }
 
@@ -1034,6 +1039,7 @@ body {
     justify-content: center;
     line-height: 1;
     transition: all 0.3s ease;
+    -webkit-backdrop-filter: blur(4px);
     backdrop-filter: blur(4px);
 }
 
@@ -1095,4 +1101,162 @@ body {
 
 .edit-mode .read-more {
     pointer-events: none;
+}
+
+/* ====================
+   MOBILE COMPATIBILITY
+   ==================== */
+
+/* Fix #5: Gallery captions visible on touch devices (no hover) */
+@media (hover: none) and (pointer: coarse) {
+    .gallery-overlay {
+        opacity: 1;
+    }
+    .gallery-note {
+        transform: translateY(0);
+    }
+    .gallery-item img {
+        filter: grayscale(30%) contrast(1.05) brightness(0.9);
+    }
+    .blog-card::before {
+        height: 100%;
+    }
+    .blog-card {
+        border-color: var(--border-light);
+    }
+}
+
+/* Fix #6: 100vh iOS Safari address bar */
+@supports (height: 100dvh) {
+    .header {
+        min-height: 100dvh;
+    }
+}
+
+/* Fix #7: inset shorthand fallback for older iOS */
+@supports not (inset: 0) {
+    .noise-overlay {
+        top: 0; right: 0; bottom: 0; left: 0;
+    }
+    .header::before {
+        top: 0; right: 0; bottom: 0; left: 0;
+    }
+    .header-bg {
+        top: 0; right: 0; bottom: 0; left: 0;
+    }
+    .header-bg::after {
+        top: 0; right: 0; bottom: 0; left: 0;
+    }
+    .avatar-ring {
+        top: -4px; right: -4px; bottom: -4px; left: -4px;
+    }
+    .gallery-overlay {
+        top: 0; right: 0; bottom: 0; left: 0;
+    }
+    .lightbox {
+        top: 0; right: 0; bottom: 0; left: 0;
+    }
+    .lightbox-bg {
+        top: 0; right: 0; bottom: 0; left: 0;
+    }
+}
+
+/* Fix #8: aspect-ratio fallback for older iOS */
+@supports not (aspect-ratio: 1) {
+    .gallery-item {
+        height: 0;
+        padding-bottom: 100%;
+    }
+    .add-btn-gallery {
+        height: 0;
+        padding-bottom: 100%;
+        min-height: unset;
+    }
+}
+
+/* Fix #9: Smooth scroll JS fallback note - handled in script.js */
+
+/* Fix #4: Custom modal to replace prompt() on iOS */
+.gh-modal-overlay {
+    position: fixed;
+    top: 0; right: 0; bottom: 0; left: 0;
+    background: rgba(0, 0, 0, 0.7);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+    z-index: 20000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.gh-modal-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 32px;
+    max-width: 420px;
+    width: 100%;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+.gh-modal-box h3 {
+    font-family: 'Oswald', sans-serif;
+    font-size: 1.1rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--text-primary);
+    margin-bottom: 20px;
+}
+.gh-modal-box label {
+    display: block;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    font-family: 'Crimson Text', serif;
+}
+.gh-modal-box input {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 16px;
+    font-family: 'Crimson Text', serif;
+    margin-bottom: 16px;
+    outline: none;
+    -webkit-appearance: none;
+}
+.gh-modal-box input:focus {
+    border-color: var(--gold-dim);
+}
+.gh-modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+.gh-modal-actions button {
+    padding: 8px 20px;
+    font-family: 'Oswald', sans-serif;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+.gh-modal-actions .gh-modal-cancel {
+    background: transparent;
+    color: var(--text-muted);
+}
+.gh-modal-actions .gh-modal-ok {
+    background: var(--gold);
+    color: var(--bg-primary);
+    border-color: var(--gold);
+}
+.gh-modal-actions .gh-modal-cancel:hover {
+    border-color: var(--text-muted);
+}
+.gh-modal-actions .gh-modal-ok:hover {
+    background: var(--gold-light);
 }

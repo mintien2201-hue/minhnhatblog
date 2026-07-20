@@ -131,6 +131,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Fix #3: visibilitychange for mobile browsers that kill pages without beforeunload
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden && isEditing) {
+            saveAllToLocal();
+        }
+    });
+
+    // Periodic auto-save every 15 seconds for mobile safety
+    setInterval(function() {
+        if (isEditing) saveAllToLocal();
+    }, 15000);
+
     // =====================
     // GALLERY
     // =====================
@@ -215,8 +227,25 @@ document.addEventListener('DOMContentLoaded', function() {
                 `;
                 document.body.appendChild(ov);
                 document.body.style.overflow = 'hidden';
+                document.body.style.position = 'fixed';
+                document.body.style.top = '-' + window.scrollY + 'px';
+                document.body.style.width = '100%';
+                var preventTouch = function(ev) { ev.preventDefault(); };
+                ov.addEventListener('touchmove', preventTouch, { passive: false });
                 setTimeout(() => ov.classList.add('active'), 10);
-                const close = () => { ov.classList.remove('active'); setTimeout(() => { ov.remove(); document.body.style.overflow = ''; }, 300); };
+                var savedScrollY = window.scrollY;
+                const close = () => {
+                    ov.classList.remove('active');
+                    ov.removeEventListener('touchmove', preventTouch);
+                    setTimeout(() => {
+                        ov.remove();
+                        document.body.style.overflow = '';
+                        document.body.style.position = '';
+                        document.body.style.top = '';
+                        document.body.style.width = '';
+                        window.scrollTo(0, savedScrollY);
+                    }, 300);
+                };
                 ov.querySelector('.lightbox-close').addEventListener('click', close);
                 ov.addEventListener('click', function(e) { if (e.target === this) close(); });
                 document.addEventListener('keydown', function h(e) { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', h); } });
@@ -332,6 +361,52 @@ document.addEventListener('DOMContentLoaded', function() {
     const GH_REPO_KEY = 'blog_gh_repo';
     const DELETED_FILES_KEY = 'blog_deleted_files';
 
+    function showGithubModal(step) {
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.className = 'gh-modal-overlay';
+            var label1 = step === 1 ? 'GitHub Token (PAT)' : 'Token da luu';
+            var label2 = step === 1 ? 'Ten repo (vd: username/repo)' : 'Ten repo (vd: username/repo)';
+            var val1 = step === 1 ? '' : (localStorage.getItem(GH_TOKEN_KEY) || '');
+            overlay.innerHTML = `
+                <div class="gh-modal-box">
+                    <h3>${step === 1 ? 'Nhap thong tin GitHub' : 'Xac nhan GitHub'}</h3>
+                    <label>${label1}</label>
+                    <input type="text" class="gh-modal-token" value="${val1}" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off" autocorrect="off" spellcheck="false">
+                    <label>${label2}</label>
+                    <input type="text" class="gh-modal-repo" value="${localStorage.getItem(GH_REPO_KEY) || ''}" placeholder="username/repo" autocomplete="off">
+                    <div class="gh-modal-actions">
+                        <button class="gh-modal-cancel">Huy</button>
+                        <button class="gh-modal-ok">Dong y</button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+            overlay.querySelector('.gh-modal-token').focus();
+            var close = (result) => { overlay.remove(); resolve(result); };
+            overlay.querySelector('.gh-modal-ok').addEventListener('click', () => {
+                var token = overlay.querySelector('.gh-modal-token').value.trim();
+                var repo = overlay.querySelector('.gh-modal-repo').value.trim();
+                if (!token || !repo) { overlay.remove(); resolve(null); return; }
+                localStorage.setItem(GH_TOKEN_KEY, token);
+                localStorage.setItem(GH_REPO_KEY, repo);
+                close({ token, repo });
+            });
+            overlay.querySelector('.gh-modal-cancel').addEventListener('click', () => close(null));
+            overlay.addEventListener('click', function(e) { if (e.target === overlay) close(null); });
+            overlay.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    var token = overlay.querySelector('.gh-modal-token').value.trim();
+                    var repo = overlay.querySelector('.gh-modal-repo').value.trim();
+                    if (!token || !repo) { overlay.remove(); resolve(null); return; }
+                    localStorage.setItem(GH_TOKEN_KEY, token);
+                    localStorage.setItem(GH_REPO_KEY, repo);
+                    close({ token, repo });
+                }
+            });
+        });
+    }
+
     function getDeletedFiles() {
         try { return JSON.parse(localStorage.getItem(DELETED_FILES_KEY)) || []; } catch { return []; }
     }
@@ -396,13 +471,8 @@ document.addEventListener('DOMContentLoaded', function() {
         let repo = localStorage.getItem(GH_REPO_KEY);
         if (token && repo) return { token, repo };
 
-        token = prompt('Nhap GitHub Token (PAT):');
-        if (!token) return null;
-        repo = prompt('Nhap ten repo (vd: username/repo):');
-        if (!repo) return null;
-        localStorage.setItem(GH_TOKEN_KEY, token);
-        localStorage.setItem(GH_REPO_KEY, repo);
-        return { token, repo };
+        const result = await showGithubModal(1);
+        return result;
     }
 
     async function publishToGitHub() {
@@ -436,12 +506,10 @@ document.addEventListener('DOMContentLoaded', function() {
             let repo = localStorage.getItem(GH_REPO_KEY);
 
             if (!token || !repo) {
-                token = prompt('Nhap GitHub Token (PAT):');
-                if (!token) { publishBtn.disabled = false; publishStatus.textContent = ''; return; }
-                repo = prompt('Nhap ten repo (vd: username/repo):');
-                if (!repo) { publishBtn.disabled = false; publishStatus.textContent = ''; return; }
-                localStorage.setItem(GH_TOKEN_KEY, token);
-                localStorage.setItem(GH_REPO_KEY, repo);
+                const result = await showGithubModal(2);
+                if (!result) { publishBtn.disabled = false; publishStatus.textContent = ''; return; }
+                token = result.token;
+                repo = result.repo;
             }
 
             const pendingImages = galleryData.filter(item => item.src && item.src.startsWith('data:'));
@@ -636,11 +704,30 @@ document.addEventListener('DOMContentLoaded', function() {
     // =====================
     // EFFECTS
     // =====================
+
+    // Fix #9: Custom smooth scroll for iOS Safari
+    function smoothScrollTo(target) {
+        var targetY = target.getBoundingClientRect().top + window.pageYOffset - 80;
+        var startY = window.pageYOffset;
+        var diff = targetY - startY;
+        if (Math.abs(diff) < 1) return;
+        var duration = Math.min(Math.abs(diff) * 0.4, 800);
+        var start = null;
+        function step(ts) {
+            if (!start) start = ts;
+            var progress = Math.min((ts - start) / duration, 1);
+            var ease = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+            window.scrollTo(0, startY + diff * ease);
+            if (progress < 1) window.requestAnimationFrame(step);
+        }
+        window.requestAnimationFrame(step);
+    }
+
     document.querySelectorAll('.main-nav a[href^="#"]').forEach(link => {
         link.addEventListener('click', function(e) {
             e.preventDefault();
             const t = document.querySelector(this.getAttribute('href'));
-            if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            if (t) smoothScrollTo(t);
         });
     });
 
