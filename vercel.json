@@ -1,9 +1,40 @@
 {
     "version": 2,
-    "rewrites": [
+    "buildCommand": "",
+    "outputDirectory": ".",
+    "builds": [
         {
-            "source": "/api/(.*)",
-            "destination": "/api/index.js"
+            "src": "api/index.js",
+            "use": "@vercel/node"
+        },
+        {
+            "src": "*.html",
+            "use": "@vercel/static"
+        },
+        {
+            "src": "*.css",
+            "use": "@vercel/static"
+        },
+        {
+            "src": "*.js",
+            "use": "@vercel/static",
+            "config": { "excludeFiles": "api/**" }
+        },
+        {
+            "src": "*.jpg",
+            "use": "@vercel/static"
+        },
+        {
+            "src": "content/**",
+            "use": "@vercel/static"
+        },
+        {
+            "src": "assets/**",
+            "use": "@vercel/static"
         }
+    ],
+    "routes": [
+        { "src": "/api/(.*)", "dest": "/api/index.js" },
+        { "handle": "filesystem" }
     ]
 }
