@@ -1,7 +1,10 @@
-[
-  {
-    "date": "2026",
-    "title": "Test",
-    "content": "Content"
-  }
-]
+{
+  "value": [
+    {
+      "date": "2026",
+      "title": "Test",
+      "content": "Content"
+    }
+  ],
+  "Count": 1
+}
