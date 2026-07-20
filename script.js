@@ -384,9 +384,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 const f = el.dataset.field;
                 if (f && site[f] !== undefined) el.innerHTML = site[f];
             });
-            saveGalleryData(gal);
-            saveBlogData(posts);
-            saveAllToLocal();
+            localStorage.setItem(GALLERY_KEY, JSON.stringify(gal));
+            localStorage.setItem(BLOG_KEY, JSON.stringify(posts));
+            localStorage.setItem('blog_data', JSON.stringify({
+                ...Object.fromEntries(editables.map(el => [el.dataset.field, el.innerHTML]).filter(([k]) => k)),
+                _gallery: gal, _posts: posts
+            }));
             renderGallery();
             renderBlog();
             console.log('Da tai du lieu tu GitHub Pages');
