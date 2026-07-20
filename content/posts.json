@@ -1,17 +1,7 @@
 [
   {
-    "date": "Ngay thang",
-    "title": "Tieu de bai viet 1",
-    "content": "Noi dung..."
-  },
-  {
-    "date": "Ngay thang",
-    "title": "Tieu de bai viet 2",
-    "content": "Noi dung..."
-  },
-  {
-    "date": "Ngay thang",
-    "title": "Tieu de bai viet 3",
-    "content": "Noi dung..."
+    "date": "2026",
+    "title": "Test",
+    "content": "Content"
   }
 ]
