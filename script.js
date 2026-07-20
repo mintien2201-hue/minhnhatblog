@@ -113,6 +113,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    window.addEventListener('beforeunload', function() {
+        clearTimeout(persistTimer);
+        if (isEditing) {
+            const siteData = {};
+            editables.forEach(el => {
+                const f = el.dataset.field;
+                if (f) siteData[f] = el.innerHTML;
+            });
+            try {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/api/save', false);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.withCredentials = true;
+                xhr.send(JSON.stringify({ site: siteData, gallery: getGalleryData(), posts: getBlogData() }));
+            } catch {}
+        }
+    });
+
     // =====================
     // GALLERY
     // =====================
@@ -435,7 +453,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     step++;
                     publishStatus.textContent = step + '/' + totalSteps + ' - Dang tai anh ' + (i + 1) + '/' + pendingImages.length + '...';
                     const b64 = galleryData[i].src.split(',')[1];
-                    const fname = generateImageFilename('upload_' + Date.now() + '.jpg');
+                    const fname = generateImageFilename('img_' + i + '_' + Date.now() + '.jpg');
                     await ghUploadImage(token, repo, GH_UPLOAD_DIR + '/' + fname, b64);
                     galleryData[i].src = 'https://raw.githubusercontent.com/' + repo + '/main/' + GH_UPLOAD_DIR + '/' + fname;
                 }
@@ -546,6 +564,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // LOAD INITIAL DATA
     // =====================
     async function initData() {
+        const hasLocalGallery = !!localStorage.getItem(GALLERY_KEY);
+        const hasLocalPosts = !!localStorage.getItem(BLOG_KEY);
+
         try {
             const [siteRes, galRes, postRes] = await Promise.all([
                 fetch('content/site.json' + CACHE_BUST), fetch('content/gallery.json' + CACHE_BUST), fetch('content/posts.json' + CACHE_BUST)
@@ -563,12 +584,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 const f = el.dataset.field;
                 if (f && site[f] !== undefined) el.innerHTML = site[f];
             });
-            try { localStorage.setItem(GALLERY_KEY, JSON.stringify(gal)); } catch (e) { console.warn('Gallery qua lon:', e.message); }
-            try { localStorage.setItem(BLOG_KEY, JSON.stringify(posts)); } catch (e) { console.warn('Posts qua lon:', e.message); }
+
+            if (!hasLocalGallery) {
+                try { localStorage.setItem(GALLERY_KEY, JSON.stringify(gal)); } catch (e) { console.warn('Gallery qua lon:', e.message); }
+            }
+            if (!hasLocalPosts) {
+                try { localStorage.setItem(BLOG_KEY, JSON.stringify(posts)); } catch (e) { console.warn('Posts qua lon:', e.message); }
+            }
             try {
                 localStorage.setItem('blog_data', JSON.stringify({
                     ...Object.fromEntries(editables.map(el => [el.dataset.field, el.innerHTML]).filter(([k]) => k)),
-                    _gallery: gal, _posts: posts
+                    _gallery: hasLocalGallery ? getGalleryData() : gal,
+                    _posts: hasLocalPosts ? getBlogData() : posts
                 }));
             } catch (e) { console.warn('Data qua lon:', e.message); }
             renderGallery();
