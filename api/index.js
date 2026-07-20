@@ -3,21 +3,41 @@ import crypto from 'crypto';
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const GITHUB_REPO = process.env.GITHUB_REPO;
 const SITE_PASSWORD = process.env.SITE_PASSWORD || '123456';
+const JWT_SECRET = process.env.JWT_SECRET || SITE_PASSWORD + '_minhnhat_blog_secret_2026';
 
-const sessions = new Map();
+function base64UrlEncode(str) {
+    return Buffer.from(str).toString('base64')
+        .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+}
+
+function base64UrlDecode(str) {
+    str = str.replace(/-/g, '+').replace(/_/g, '/');
+    while (str.length % 4) str += '=';
+    return Buffer.from(str, 'base64').toString();
+}
 
 function createSession() {
-    const token = crypto.randomBytes(32).toString('hex');
-    sessions.set(token, Date.now() + 24 * 60 * 60 * 1000);
-    return token;
+    const payload = { exp: Date.now() + 24 * 60 * 60 * 1000 };
+    const header = base64UrlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+    const body = base64UrlEncode(JSON.stringify(payload));
+    const signature = crypto.createHmac('sha256', JWT_SECRET).update(header + '.' + body).digest('base64')
+        .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+    return header + '.' + body + '.' + signature;
 }
 
 function isValidSession(token) {
     if (!token) return false;
-    const expiry = sessions.get(token);
-    if (!expiry) return false;
-    if (Date.now() > expiry) { sessions.delete(token); return false; }
-    return true;
+    const parts = token.split('.');
+    if (parts.length !== 3) return false;
+    const [header, body, signature] = parts;
+    const expectedSig = crypto.createHmac('sha256', JWT_SECRET).update(header + '.' + body).digest('base64')
+        .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+    if (signature !== expectedSig) return false;
+    try {
+        const payload = JSON.parse(base64UrlDecode(body));
+        if (Date.now() > payload.exp) return false;
+        return true;
+    } catch { return false; }
 }
 
 function parseCookies(req) {
