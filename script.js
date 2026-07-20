@@ -261,6 +261,25 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             saveAllToLocal();
 
+            const siteData = {};
+            editables.forEach(el => {
+                const f = el.dataset.field;
+                if (f) siteData[f] = el.innerHTML;
+            });
+            const galleryData = getGalleryData();
+            const postsData = getBlogData();
+
+            publishStatus.textContent = 'Luu file local...';
+            try {
+                await fetch('/api/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ site: siteData, gallery: galleryData, posts: postsData })
+                });
+            } catch (e) {
+                console.warn('Khong the luu local (co the dang tren GitHub Pages):', e.message);
+            }
+
             let token = localStorage.getItem(GH_TOKEN_KEY);
             let repo = localStorage.getItem(GH_REPO_KEY);
 
@@ -273,26 +292,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 localStorage.setItem(GH_REPO_KEY, repo);
             }
 
-            publishStatus.textContent = '1/4 - Kiem tra ket noi...';
-
-            const siteData = {};
-            editables.forEach(el => {
-                const f = el.dataset.field;
-                if (f) siteData[f] = el.innerHTML;
-            });
-            const galleryData = getGalleryData();
-            const postsData = getBlogData();
-
-            publishStatus.textContent = '2/4 - Dang tai site.json...';
+            publishStatus.textContent = '1/3 - Dang tai site.json...';
             await ghCommitFile(token, repo, 'content/site.json', JSON.stringify(siteData, null, 2));
 
-            publishStatus.textContent = '3/4 - Dang tai gallery.json...';
+            publishStatus.textContent = '2/3 - Dang tai gallery.json...';
             await ghCommitFile(token, repo, 'content/gallery.json', JSON.stringify(galleryData, null, 2));
 
-            publishStatus.textContent = '4/4 - Dang tai posts.json...';
+            publishStatus.textContent = '3/3 - Dang tai posts.json...';
             await ghCommitFile(token, repo, 'content/posts.json', JSON.stringify(postsData, null, 2));
 
-            const ts = Date.now();
             publishStatus.innerHTML = '✓ Da xuat ban thanh cong! <span style="opacity:0.6;font-size:0.7rem;margin-left:4px;">Reload trang de xem</span>';
 
             setTimeout(() => { publishStatus.textContent = ''; }, 6000);
