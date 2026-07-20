@@ -1,4 +1,4 @@
-const crypto = require('crypto');
+import crypto from 'crypto';
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const GITHUB_REPO = process.env.GITHUB_REPO;
@@ -70,7 +70,7 @@ async function parseBody(req) {
     try { return JSON.parse(body); } catch { return body; }
 }
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -139,4 +139,4 @@ module.exports = async (req, res) => {
         console.error('API Error:', error);
         return res.status(500).json({ ok: false, error: error.message });
     }
-};
+}
