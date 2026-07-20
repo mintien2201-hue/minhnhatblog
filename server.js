@@ -1,11 +1,27 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { execSync } = require('child_process');
 
 const PORT = 3000;
 const PASSWORD = '123456';
 const ROOT = __dirname;
+
+const sessions = new Map();
+
+function createSession() {
+    const token = crypto.randomBytes(32).toString('hex');
+    sessions.set(token, { created: Date.now(), expires: Date.now() + 24 * 60 * 60 * 1000 });
+    return token;
+}
+
+function isValidSession(token) {
+    if (!token || !sessions.has(token)) return false;
+    const s = sessions.get(token);
+    if (Date.now() > s.expires) { sessions.delete(token); return false; }
+    return true;
+}
 
 const MIME = {
     '.html': 'text/html; charset=utf-8',
@@ -70,15 +86,14 @@ const server = http.createServer(async (req, res) => {
         return res.end();
     }
 
-    if (pathname === '/api/login' && req.method === 'POST') {
-        const body = await parseBody(req);
-        if (body.password === PASSWORD) {
-            return send(res, 200, { ok: true });
-        }
-        return send(res, 401, { ok: false, error: 'Sai mat khau' });
-    }
-
     if (pathname === '/api/save' && req.method === 'POST') {
+        const cookies = (req.headers.cookie || '').split(';').reduce((acc, c) => {
+            const [k, v] = c.trim().split('=');
+            acc[k] = v; return acc;
+        }, {});
+        if (!isValidSession(cookies.blog_token)) {
+            return send(res, 401, { ok: false, error: 'Chua dang nhap' });
+        }
         const body = await parseBody(req);
         try {
             if (body.site) {
@@ -95,6 +110,43 @@ const server = http.createServer(async (req, res) => {
         } catch (err) {
             return send(res, 500, { ok: false, error: err.message });
         }
+    }
+
+    if (pathname === '/api/login' && req.method === 'POST') {
+        const body = await parseBody(req);
+        if (body.password === PASSWORD) {
+            const token = createSession();
+            res.writeHead(200, {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*',
+                'Set-Cookie': `blog_token=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=86400`
+            });
+            return res.end(JSON.stringify({ ok: true }));
+        }
+        return send(res, 401, { ok: false, error: 'Sai mat khau' });
+    }
+
+    if (pathname === '/api/logout' && req.method === 'POST') {
+        const cookies = (req.headers.cookie || '').split(';').reduce((acc, c) => {
+            const [k, v] = c.trim().split('=');
+            acc[k] = v; return acc;
+        }, {});
+        if (cookies.blog_token) sessions.delete(cookies.blog_token);
+        res.writeHead(200, {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': '*',
+            'Set-Cookie': 'blog_token=; Path=/; HttpOnly; Max-Age=0'
+        });
+        return res.end(JSON.stringify({ ok: true }));
+    }
+
+    if (pathname === '/api/session' && req.method === 'GET') {
+        const cookies = (req.headers.cookie || '').split(';').reduce((acc, c) => {
+            const [k, v] = c.trim().split('=');
+            acc[k] = v; return acc;
+        }, {});
+        const valid = isValidSession(cookies.blog_token);
+        return send(res, 200, { loggedIn: valid });
     }
 
     let filePath = path.join(ROOT, pathname === '/' ? 'index.html' : pathname);
@@ -115,5 +167,6 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
     console.log(`Blog server dang chay tai http://localhost:${PORT}`);
+    console.log(`Dang nhap admin: http://localhost:${PORT}/login.html`);
     console.log(`Nhan Ctrl+C de dung`);
 });

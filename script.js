@@ -6,14 +6,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // =====================
     // LOGIN CHECK
     // =====================
-    const loggedIn = sessionStorage.getItem('blog_logged_in');
     const adminControls = document.getElementById('adminControls');
 
-    if (!loggedIn) {
+    fetch('/api/session').then(r => r.json()).then(data => {
+        if (data.loggedIn) {
+            adminControls.style.display = '';
+        } else {
+            adminControls.style.display = 'none';
+        }
+    }).catch(() => {
         adminControls.style.display = 'none';
-    } else {
-        adminControls.style.display = '';
-    }
+    });
 
     // DOM
     const editBtn = document.getElementById('editToggle');
@@ -29,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // LOGOUT
     // =====================
     logoutBtn.addEventListener('click', function() {
-        sessionStorage.removeItem('blog_logged_in');
+        fetch('/api/logout', { method: 'POST' });
         enableEditing(false);
         adminControls.style.display = 'none';
     });
@@ -49,13 +52,35 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     editBtn.addEventListener('click', function() {
-        if (!sessionStorage.getItem('blog_logged_in')) return;
-        enableEditing(!isEditing);
+        fetch('/api/session').then(r => r.json()).then(data => {
+            if (!data.loggedIn) return;
+            enableEditing(!isEditing);
+        });
     });
 
     // =====================
     // LOCAL STORAGE SAVE/LOAD
     // =====================
+    let persistTimer = null;
+    function persistToServer() {
+        clearTimeout(persistTimer);
+        persistTimer = setTimeout(async () => {
+            try {
+                const siteData = {};
+                editables.forEach(el => {
+                    const f = el.dataset.field;
+                    if (f) siteData[f] = el.innerHTML;
+                });
+                await fetch('/api/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ site: siteData, gallery: getGalleryData(), posts: getBlogData() })
+                });
+            } catch {}
+        }, 800);
+    }
+
     function saveAllToLocal() {
         const data = {};
         editables.forEach(el => {
@@ -64,7 +89,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         data._gallery = getGalleryData();
         data._posts = getBlogData();
-        localStorage.setItem('blog_data', JSON.stringify(data));
+        try { localStorage.setItem('blog_data', JSON.stringify(data)); } catch {}
+        persistToServer();
     }
 
     function loadFromLocal() {
@@ -134,8 +160,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     const idx = Array.from(galleryGrid.children).indexOf(item);
                     if (idx > -1) {
                         const removed = data[idx];
-                        if (removed && removed.src && !removed.src.startsWith('data:')) {
-                            addDeletedFile(removed.src);
+                        if (removed && removed.src) {
+                            if (removed.src.startsWith('https://raw.githubusercontent.com/')) {
+                                const repoPath = extractGitHubPath(removed.src);
+                                if (repoPath) addDeletedFile(repoPath);
+                            } else if (!removed.src.startsWith('data:') && removed.src) {
+                                addDeletedFile(removed.src);
+                            }
                         }
                         data.splice(idx, 1); saveGalleryData(data); saveAllToLocal(); renderGallery();
                     }
@@ -179,9 +210,30 @@ document.addEventListener('DOMContentLoaded', function() {
         const file = this.files[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = function(e) {
+        reader.onload = async function(e) {
+            const dataUrl = e.target.result;
+            const base64Content = dataUrl.split(',')[1];
+            let src = dataUrl;
+
+            const auth = await ensureGithubToken();
+            if (auth) {
+                try {
+                    publishStatus.textContent = 'Dang tai anh len GitHub...';
+                    const filename = generateImageFilename(file.name);
+                    await ghUploadImage(auth.token, auth.repo, GH_UPLOAD_DIR + '/' + filename, base64Content);
+                    src = 'https://raw.githubusercontent.com/' + auth.repo + '/main/' + GH_UPLOAD_DIR + '/' + filename;
+                    publishStatus.textContent = '';
+                } catch (err) {
+                    console.warn('Loi tai anh len GitHub:', err.message);
+                    publishStatus.textContent = 'Loi tai anh. Anh se duoc tai len khi xuat ban.';
+                }
+            } else {
+                publishStatus.textContent = 'Khong co GitHub Token. Anh luu tam thoi.';
+                setTimeout(() => { publishStatus.textContent = ''; }, 3000);
+            }
+
             const data = getGalleryData();
-            data.push({ src: e.target.result, note: 'Ghi chu...' });
+            data.push({ src: src, note: 'Ghi chu...' });
             saveGalleryData(data); saveAllToLocal(); renderGallery();
         };
         reader.readAsDataURL(file);
@@ -279,6 +331,62 @@ document.addEventListener('DOMContentLoaded', function() {
         localStorage.removeItem(DELETED_FILES_KEY);
     }
 
+    const GH_UPLOAD_DIR = 'assets/uploads';
+
+    function generateImageFilename(originalName) {
+        const ext = (originalName.split('.').pop() || 'jpg').toLowerCase();
+        return 'img_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8) + '.' + ext;
+    }
+
+    function extractGitHubPath(url) {
+        try {
+            const parts = new URL(url).pathname.split('/').filter(Boolean);
+            return parts.slice(3).join('/');
+        } catch { return null; }
+    }
+
+    async function ghUploadImage(token, repo, path, base64Content) {
+        let sha = null;
+        try {
+            const res = await fetch('https://api.github.com/repos/' + repo + '/contents/' + path, {
+                headers: { Authorization: 'token ' + token }
+            });
+            if (res.ok) { const d = await res.json(); sha = d.sha; }
+        } catch {}
+
+        const body = {
+            message: 'Upload anh: ' + path.split('/').pop(),
+            content: base64Content,
+            branch: 'main'
+        };
+        if (sha) body.sha = sha;
+
+        const res = await fetch('https://api.github.com/repos/' + repo + '/contents/' + path, {
+            method: 'PUT',
+            headers: { Authorization: 'token ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.message || 'Upload that bai [HTTP ' + res.status + ']');
+        }
+    }
+
+    async function ensureGithubToken() {
+        let token = localStorage.getItem(GH_TOKEN_KEY);
+        let repo = localStorage.getItem(GH_REPO_KEY);
+        if (token && repo) return { token, repo };
+
+        token = prompt('Nhap GitHub Token (PAT):');
+        if (!token) return null;
+        repo = prompt('Nhap ten repo (vd: username/repo):');
+        if (!repo) return null;
+        localStorage.setItem(GH_TOKEN_KEY, token);
+        localStorage.setItem(GH_REPO_KEY, repo);
+        return { token, repo };
+    }
+
     async function publishToGitHub() {
         publishBtn.disabled = true;
 
@@ -299,6 +407,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 await fetch('/api/save', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify({ site: siteData, gallery: galleryData, posts: postsData })
                 });
             } catch (e) {
@@ -317,8 +426,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 localStorage.setItem(GH_REPO_KEY, repo);
             }
 
-            const totalSteps = 3 + deletedFiles.length;
+            const pendingImages = galleryData.filter(item => item.src && item.src.startsWith('data:'));
+            const totalSteps = 3 + deletedFiles.length + pendingImages.length;
             let step = 0;
+
+            for (let i = 0; i < galleryData.length; i++) {
+                if (galleryData[i].src && galleryData[i].src.startsWith('data:')) {
+                    step++;
+                    publishStatus.textContent = step + '/' + totalSteps + ' - Dang tai anh ' + (i + 1) + '/' + pendingImages.length + '...';
+                    const b64 = galleryData[i].src.split(',')[1];
+                    const fname = generateImageFilename('upload_' + Date.now() + '.jpg');
+                    await ghUploadImage(token, repo, GH_UPLOAD_DIR + '/' + fname, b64);
+                    galleryData[i].src = 'https://raw.githubusercontent.com/' + repo + '/main/' + GH_UPLOAD_DIR + '/' + fname;
+                }
+            }
+            saveGalleryData(galleryData);
 
             step++; publishStatus.textContent = step + '/' + totalSteps + ' - Dang tai site.json...';
             await ghCommitFile(token, repo, 'content/site.json', JSON.stringify(siteData, null, 2));
@@ -441,12 +563,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 const f = el.dataset.field;
                 if (f && site[f] !== undefined) el.innerHTML = site[f];
             });
-            localStorage.setItem(GALLERY_KEY, JSON.stringify(gal));
-            localStorage.setItem(BLOG_KEY, JSON.stringify(posts));
-            localStorage.setItem('blog_data', JSON.stringify({
-                ...Object.fromEntries(editables.map(el => [el.dataset.field, el.innerHTML]).filter(([k]) => k)),
-                _gallery: gal, _posts: posts
-            }));
+            try { localStorage.setItem(GALLERY_KEY, JSON.stringify(gal)); } catch (e) { console.warn('Gallery qua lon:', e.message); }
+            try { localStorage.setItem(BLOG_KEY, JSON.stringify(posts)); } catch (e) { console.warn('Posts qua lon:', e.message); }
+            try {
+                localStorage.setItem('blog_data', JSON.stringify({
+                    ...Object.fromEntries(editables.map(el => [el.dataset.field, el.innerHTML]).filter(([k]) => k)),
+                    _gallery: gal, _posts: posts
+                }));
+            } catch (e) { console.warn('Data qua lon:', e.message); }
             renderGallery();
             renderBlog();
             console.log('Da tai du lieu tu GitHub Pages');
