@@ -6,12 +6,12 @@
   },
   {
     "date": "Ngay thang",
-    "title": "Bài viết 1",
+    "title": "Bài viết 2",
     "content": "Noi dung..."
   },
   {
     "date": "Ngay thang",
-    "title": "Tieu de",
-    "content": "Noi dung..."
+    "title": "bài viết 3<div><br></div>",
+    "content": "Noi dung.."
   }
 ]
