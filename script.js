@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', function() {
 
     let isEditing = false;
+    const CACHE_BUST = '?v=' + Date.now();
 
     // =====================
     // LOGIN CHECK
@@ -256,7 +257,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function publishToGitHub() {
         publishBtn.disabled = true;
-        publishStatus.textContent = 'Dang xuat ban...';
 
         try {
             saveAllToLocal();
@@ -273,6 +273,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 localStorage.setItem(GH_REPO_KEY, repo);
             }
 
+            publishStatus.textContent = '1/4 - Kiem tra ket noi...';
+
             const siteData = {};
             editables.forEach(el => {
                 const f = el.dataset.field;
@@ -281,20 +283,34 @@ document.addEventListener('DOMContentLoaded', function() {
             const galleryData = getGalleryData();
             const postsData = getBlogData();
 
+            publishStatus.textContent = '2/4 - Dang tai site.json...';
             await ghCommitFile(token, repo, 'content/site.json', JSON.stringify(siteData, null, 2));
+
+            publishStatus.textContent = '3/4 - Dang tai gallery.json...';
             await ghCommitFile(token, repo, 'content/gallery.json', JSON.stringify(galleryData, null, 2));
+
+            publishStatus.textContent = '4/4 - Dang tai posts.json...';
             await ghCommitFile(token, repo, 'content/posts.json', JSON.stringify(postsData, null, 2));
 
-            publishStatus.textContent = 'Da xuat ban thanh cong!';
-            setTimeout(() => { publishStatus.textContent = ''; }, 4000);
+            const ts = Date.now();
+            publishStatus.innerHTML = '✓ Da xuat ban thanh cong! <span style="opacity:0.6;font-size:0.7rem;margin-left:4px;">Reload trang de xem</span>';
+
+            setTimeout(() => { publishStatus.textContent = ''; }, 6000);
 
         } catch (err) {
-            publishStatus.textContent = 'Loi: ' + err.message;
+            console.error('Publish error:', err);
+            let msg = err.message;
             if (err.message.includes('401') || err.message.includes('403')) {
                 localStorage.removeItem(GH_TOKEN_KEY);
-                publishStatus.textContent = 'Token sai. Hay nhap lai.';
+                msg = 'Token sai/het han. Hay nhap lai token moi.';
+            } else if (err.message.includes('404')) {
+                msg = 'Repo khong ton tai. Kiem tra lai ten repo (username/repo).';
+            } else if (err.message.includes('422')) {
+                msg = 'File qua lon hoac bi trung. Thu giam kich thuoc anh.';
+            } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+                msg = 'Loi mang. Kiem tra ket noi internet.';
             }
-            console.error(err);
+            publishStatus.innerHTML = '✗ Loi: ' + msg + ' <span style="opacity:0.6;font-size:0.7rem;margin-left:4px;">[F12 xem chi tiet]</span>';
         }
         publishBtn.disabled = false;
     }
@@ -302,28 +318,38 @@ document.addEventListener('DOMContentLoaded', function() {
     async function ghCommitFile(token, repo, path, content) {
         let sha = null;
         try {
-            const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+            const res = await fetch('https://api.github.com/repos/' + repo + '/contents/' + path, {
                 headers: { Authorization: 'token ' + token }
             });
             if (res.ok) { const d = await res.json(); sha = d.sha; }
-        } catch {}
+            else if (res.status === 404) { /* file chua ton tai, se tao moi */ }
+            else if (res.status === 401 || res.status === 403) {
+                throw new Error('Token khong co quyen truy cap repo nay (HTTP ' + res.status + ')');
+            }
+        } catch (e) {
+            if (e.message.includes('Token')) throw e;
+        }
 
         const body = {
-            message: 'Cap nhat ' + path,
+            message: 'Cap nhat ' + path + ' - ' + new Date().toLocaleString('vi-VN'),
             content: btoa(unescape(encodeURIComponent(content))),
             branch: 'main'
         };
         if (sha) body.sha = sha;
 
-        const res = await fetch(`https://api.github.com/repos/${repo}/contents/${path}`, {
+        if (content.length > 1000000) {
+            console.warn('File ' + path + ' rat lon: ~' + Math.round(content.length / 1024) + 'KB');
+        }
+
+        const res = await fetch('https://api.github.com/repos/' + repo + '/contents/' + path, {
             method: 'PUT',
             headers: { Authorization: 'token ' + token, 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
         });
 
         if (!res.ok) {
-            const err = await res.json();
-            throw new Error(err.message || 'GitHub API loi ' + res.status);
+            const err = await res.json().catch(() => ({}));
+            throw new Error((err.message || 'GitHub API loi') + ' [' + path + ' - HTTP ' + res.status + ']');
         }
     }
 
@@ -335,8 +361,13 @@ document.addEventListener('DOMContentLoaded', function() {
     async function initData() {
         try {
             const [siteRes, galRes, postRes] = await Promise.all([
-                fetch('content/site.json'), fetch('content/gallery.json'), fetch('content/posts.json')
+                fetch('content/site.json' + CACHE_BUST), fetch('content/gallery.json' + CACHE_BUST), fetch('content/posts.json' + CACHE_BUST)
             ]);
+
+            if (!siteRes.ok) throw new Error('site.json HTTP ' + siteRes.status);
+            if (!galRes.ok) throw new Error('gallery.json HTTP ' + galRes.status);
+            if (!postRes.ok) throw new Error('posts.json HTTP ' + postRes.status);
+
             const site = await siteRes.json();
             const gal = await galRes.json();
             const posts = await postRes.json();
@@ -350,10 +381,14 @@ document.addEventListener('DOMContentLoaded', function() {
             saveAllToLocal();
             renderGallery();
             renderBlog();
+            console.log('Da tai du lieu tu GitHub Pages');
             return;
-        } catch (e) {}
+        } catch (e) {
+            console.warn('Khong the tai tu JSON:', e.message);
+        }
 
         if (loadFromLocal()) {
+            console.log('Su du lieu tu localStorage');
             renderGallery();
             renderBlog();
             return;
