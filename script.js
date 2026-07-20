@@ -132,7 +132,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     e.stopPropagation();
                     const data = getGalleryData();
                     const idx = Array.from(galleryGrid.children).indexOf(item);
-                    if (idx > -1) { data.splice(idx, 1); saveGalleryData(data); saveAllToLocal(); renderGallery(); }
+                    if (idx > -1) {
+                        const removed = data[idx];
+                        if (removed && removed.src && !removed.src.startsWith('data:')) {
+                            addDeletedFile(removed.src);
+                        }
+                        data.splice(idx, 1); saveGalleryData(data); saveAllToLocal(); renderGallery();
+                    }
                 });
             }
             const note = item.querySelector('.gallery-note');
@@ -254,6 +260,24 @@ document.addEventListener('DOMContentLoaded', function() {
     // =====================
     const GH_TOKEN_KEY = 'blog_gh_token';
     const GH_REPO_KEY = 'blog_gh_repo';
+    const DELETED_FILES_KEY = 'blog_deleted_files';
+
+    function getDeletedFiles() {
+        try { return JSON.parse(localStorage.getItem(DELETED_FILES_KEY)) || []; } catch { return []; }
+    }
+
+    function addDeletedFile(filename) {
+        if (!filename || filename.startsWith('data:')) return;
+        const list = getDeletedFiles();
+        if (!list.includes(filename)) {
+            list.push(filename);
+            localStorage.setItem(DELETED_FILES_KEY, JSON.stringify(list));
+        }
+    }
+
+    function clearDeletedFiles() {
+        localStorage.removeItem(DELETED_FILES_KEY);
+    }
 
     async function publishToGitHub() {
         publishBtn.disabled = true;
@@ -268,6 +292,7 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             const galleryData = getGalleryData();
             const postsData = getBlogData();
+            const deletedFiles = getDeletedFiles();
 
             publishStatus.textContent = 'Luu file local...';
             try {
@@ -292,14 +317,27 @@ document.addEventListener('DOMContentLoaded', function() {
                 localStorage.setItem(GH_REPO_KEY, repo);
             }
 
-            publishStatus.textContent = '1/3 - Dang tai site.json...';
+            const totalSteps = 3 + deletedFiles.length;
+            let step = 0;
+
+            step++; publishStatus.textContent = step + '/' + totalSteps + ' - Dang tai site.json...';
             await ghCommitFile(token, repo, 'content/site.json', JSON.stringify(siteData, null, 2));
 
-            publishStatus.textContent = '2/3 - Dang tai gallery.json...';
+            step++; publishStatus.textContent = step + '/' + totalSteps + ' - Dang tai gallery.json...';
             await ghCommitFile(token, repo, 'content/gallery.json', JSON.stringify(galleryData, null, 2));
 
-            publishStatus.textContent = '3/3 - Dang tai posts.json...';
+            step++; publishStatus.textContent = step + '/' + totalSteps + ' - Dang tai posts.json...';
             await ghCommitFile(token, repo, 'content/posts.json', JSON.stringify(postsData, null, 2));
+
+            for (const file of deletedFiles) {
+                step++; publishStatus.textContent = step + '/' + totalSteps + ' - Dang xoa ' + file + '...';
+                try {
+                    await ghDeleteFile(token, repo, file);
+                } catch (e) {
+                    console.warn('Khong xoa duoc ' + file + ':', e.message);
+                }
+            }
+            clearDeletedFiles();
 
             publishStatus.innerHTML = '✓ Da xuat ban thanh cong! <span style="opacity:0.6;font-size:0.7rem;margin-left:4px;">Reload trang de xem</span>';
 
@@ -358,6 +396,25 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
             throw new Error((err.message || 'GitHub API loi') + ' [' + path + ' - HTTP ' + res.status + ']');
+        }
+    }
+
+    async function ghDeleteFile(token, repo, path) {
+        const res = await fetch('https://api.github.com/repos/' + repo + '/contents/' + path, {
+            headers: { Authorization: 'token ' + token }
+        });
+        if (res.status === 404) return;
+        if (!res.ok) throw new Error('Khong lay duoc sha cua ' + path + ' (HTTP ' + res.status + ')');
+        const d = await res.json();
+        const sha = d.sha;
+        const delRes = await fetch('https://api.github.com/repos/' + repo + '/contents/' + path, {
+            method: 'DELETE',
+            headers: { Authorization: 'token ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: 'Xoa ' + path, sha: sha, branch: 'main' })
+        });
+        if (!delRes.ok) {
+            const err = await delRes.json().catch(() => ({}));
+            throw new Error((err.message || 'Loi xoa') + ' [' + path + ' - HTTP ' + delRes.status + ']');
         }
     }
 
