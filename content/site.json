@@ -1,3 +1,21 @@
 {
-  "test": "jwt"
+  "name": "Ph?m Minh Nh?t",
+  "title": "Tattoo Artist",
+  "tagline": "\"M?i du?ng kim l� m?t c�u chuy?n\"",
+  "about1": "Ph?m Minh Nh?t - Tattoo Artist v?i dam m� ngh? thu?t xam h�nh tr�n da. M?i t�c ph?m l� m?t c�u chuy?n ri�ng, du?c k? qua t?ng du?ng kim t? m? v� d?y c?m x�c.",
+  "about2": "V?i nhi?u nam kinh nghi?m trong ngh?, t�i cam k?t mang d?n cho kh�ch h�ng nh?ng t�c ph?m ch?t lu?ng nh?t, ph� h?p v?i c� t�nh v� c�u chuy?n c?a m?i ngu?i.",
+  "stat1_num": "<br>",
+  "stat1_label": "T�c ph?m",
+  "stat2_num": "8",
+  "stat2_label": "Nam kinh nghi?m",
+  "stat3_num": "<br>",
+  "stat3_label": "H�i l�ng",
+  "quote_text": "\"Ngh? thu?t xam h�nh kh�ng ch? l� v? tr�n da, m� l� k? c�u chuy?n c?a cu?c d?i\"",
+  "quote_author": "- Ph?m Minh Nh?t",
+  "contact_address": "d?a ch?: 85/32 Tr?n D�nh Xu, C?u �ng L�nh, qu?n 1.",
+  "contact_phone": "s? di?n tho?i",
+  "contact_email": "email: pnhat8441@gmail.com",
+  "contact_instagram": "instagram: imnhat_tattooer",
+  "footer_text": "� 2026 Ph?m Minh Nh?t. All rights reserved.",
+  "footer_slogan": "M?i du?ng kim l� m?t c�u chuy?n"
 }
