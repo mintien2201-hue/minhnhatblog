@@ -1,10 +1,17 @@
-{
-  "value": [
-    {
-      "date": "2026",
-      "title": "Test",
-      "content": "Content"
-    }
-  ],
-  "Count": 1
-}
+[
+  {
+    "date": "2026",
+    "title": "bài viết 1",
+    "content": "Content"
+  },
+  {
+    "date": "Ngay thang",
+    "title": "Bài viết 2",
+    "content": "Noi dung..."
+  },
+  {
+    "date": "Ngay thang",
+    "title": "bài viết 3<div><br></div>",
+    "content": "Noi dung.."
+  }
+]
