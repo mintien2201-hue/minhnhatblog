@@ -27,6 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const galleryGrid = document.getElementById('gallery-grid');
     const blogGrid = document.getElementById('blog-grid');
     const editables = document.querySelectorAll('[contenteditable]');
+    let revealObserver;
 
     // =====================
     // LOGOUT
@@ -174,6 +175,9 @@ document.addEventListener('DOMContentLoaded', function() {
             const div = document.createElement('div');
             div.className = 'gallery-item';
             div.setAttribute('data-index', i);
+            div.setAttribute('data-reveal', '');
+            div.setAttribute('data-reveal-delay', String((i % 4 + 1) * 100));
+            if (revealObserver) revealObserver.observe(div);
             div.innerHTML = `
                 <img src="${item.src}" alt="Tac pham" loading="lazy">
                 <div class="gallery-overlay">
@@ -334,6 +338,9 @@ document.addEventListener('DOMContentLoaded', function() {
         data.forEach((post, i) => {
             const article = document.createElement('article');
             article.className = 'blog-card';
+            article.setAttribute('data-reveal', '');
+            article.setAttribute('data-reveal-delay', String((i % 4 + 1) * 100));
+            if (revealObserver) revealObserver.observe(article);
             article.innerHTML = `
                 <div class="card-date" contenteditable="${isEditing}">${post.date || ''}</div>
                 <h3 contenteditable="${isEditing}">${post.title || ''}</h3>
@@ -518,18 +525,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const postsData = getBlogData();
             const deletedFiles = getDeletedFiles();
 
-            publishStatus.textContent = 'Luu file local...';
-            try {
-                await fetch('/api/save', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ site: siteData, gallery: galleryData, posts: postsData })
-                });
-            } catch (e) {
-                console.warn('Khong the luu local (co the dang tren GitHub Pages):', e.message);
-            }
-
             let token = localStorage.getItem(GH_TOKEN_KEY);
             let repo = localStorage.getItem(GH_REPO_KEY);
 
@@ -541,7 +536,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
 
             const pendingImages = galleryData.filter(item => item.src && item.src.startsWith('data:'));
-            const totalSteps = 3 + deletedFiles.length + pendingImages.length;
+            const totalSteps = 2 + deletedFiles.length + pendingImages.length;
             let step = 0;
 
             for (let i = 0; i < galleryData.length; i++) {
@@ -556,14 +551,15 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             saveGalleryData(galleryData);
 
-            step++; publishStatus.textContent = step + '/' + totalSteps + ' - Dang tai site.json...';
-            await ghCommitFile(token, repo, 'content/site.json', JSON.stringify(siteData, null, 2));
-
-            step++; publishStatus.textContent = step + '/' + totalSteps + ' - Dang tai gallery.json...';
-            await ghCommitFile(token, repo, 'content/gallery.json', JSON.stringify(galleryData, null, 2));
-
-            step++; publishStatus.textContent = step + '/' + totalSteps + ' - Dang tai posts.json...';
-            await ghCommitFile(token, repo, 'content/posts.json', JSON.stringify(postsData, null, 2));
+            step++; publishStatus.textContent = step + '/' + totalSteps + ' - Dang luu vao GitHub...';
+            const res = await fetch('/api/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ site: siteData, gallery: galleryData, posts: postsData })
+            });
+            const result = await res.json();
+            if (!result.ok) throw new Error(result.error || 'Loi server');
 
             for (const file of deletedFiles) {
                 step++; publishStatus.textContent = step + '/' + totalSteps + ' - Dang xoa ' + file + '...';
@@ -595,44 +591,6 @@ document.addEventListener('DOMContentLoaded', function() {
             publishStatus.innerHTML = '✗ Loi: ' + msg + ' <span style="opacity:0.6;font-size:0.7rem;margin-left:4px;">[F12 xem chi tiet]</span>';
         }
         publishBtn.disabled = false;
-    }
-
-    async function ghCommitFile(token, repo, path, content) {
-        let sha = null;
-        try {
-            const res = await fetch('https://api.github.com/repos/' + repo + '/contents/' + path, {
-                headers: { Authorization: 'token ' + token }
-            });
-            if (res.ok) { const d = await res.json(); sha = d.sha; }
-            else if (res.status === 404) { /* file chua ton tai, se tao moi */ }
-            else if (res.status === 401 || res.status === 403) {
-                throw new Error('Token khong co quyen truy cap repo nay (HTTP ' + res.status + ')');
-            }
-        } catch (e) {
-            if (e.message.includes('Token')) throw e;
-        }
-
-        const body = {
-            message: 'Cap nhat ' + path + ' - ' + new Date().toLocaleString('vi-VN'),
-            content: btoa(unescape(encodeURIComponent(content))),
-            branch: 'main'
-        };
-        if (sha) body.sha = sha;
-
-        if (content.length > 1000000) {
-            console.warn('File ' + path + ' rat lon: ~' + Math.round(content.length / 1024) + 'KB');
-        }
-
-        const res = await fetch('https://api.github.com/repos/' + repo + '/contents/' + path, {
-            method: 'PUT',
-            headers: { Authorization: 'token ' + token, 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        });
-
-        if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error((err.message || 'GitHub API loi') + ' [' + path + ' - HTTP ' + res.status + ']');
-        }
     }
 
     async function ghDeleteFile(token, repo, path) {
@@ -752,22 +710,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    const observer = new IntersectionObserver(entries => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.style.opacity = '0';
-                entry.target.style.transform = 'translateY(30px)';
-                setTimeout(() => {
-                    entry.target.style.transition = 'all 0.8s ease-out';
-                    entry.target.style.opacity = '1';
-                    entry.target.style.transform = 'translateY(0)';
-                }, 100);
-                observer.unobserve(entry.target);
-            }
-        });
-    }, { threshold: 0.1 });
-    document.querySelectorAll('.blog-card, .gallery-item, .text-block, .contact-item').forEach(el => observer.observe(el));
-
     const sections = document.querySelectorAll('section[id]');
     const navLinks = document.querySelectorAll('.main-nav a');
     window.addEventListener('scroll', () => {
@@ -791,21 +733,38 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    const statObserver = new IntersectionObserver(entries => {
+    function animateCounter(el) {
+        const text = el.textContent.trim();
+        const target = parseInt(text);
+        if (isNaN(target) || target === 0) return;
+        const start = performance.now();
+        const duration = 1500;
+        function update(now) {
+            const elapsed = now - start;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased = 1 - Math.pow(1 - progress, 3);
+            el.textContent = Math.round(eased * target) + (text.includes('+') ? '+' : '');
+            if (progress < 1) requestAnimationFrame(update);
+            else el.textContent = text;
+        }
+        requestAnimationFrame(update);
+    }
+
+    revealObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const el = entry.target, text = el.textContent.trim(), num = parseInt(text);
-                if (!isNaN(num)) {
-                    let cur = 0, inc = Math.ceil(num / 40);
-                    const t = setInterval(() => {
-                        cur += inc;
-                        if (cur >= num) { el.textContent = text; clearInterval(t); }
-                        else el.textContent = cur + (text.includes('+') ? '+' : '');
-                    }, 40);
-                }
-                statObserver.unobserve(el);
+            if (!entry.isIntersecting) return;
+            const el = entry.target;
+            el.classList.add('revealed');
+            revealObserver.unobserve(el);
+            if (el.classList.contains('stat-number')) {
+                animateCounter(el);
+            } else {
+                el.querySelectorAll('.stat-number').forEach(animateCounter);
             }
         });
-    }, { threshold: 0.5 });
-    document.querySelectorAll('.stat-number').forEach(el => statObserver.observe(el));
+    }, { threshold: 0.15, rootMargin: '0px 0px -50px 0px' });
+
+    document.querySelectorAll('[data-reveal]').forEach(el => {
+        if (!el.classList.contains('revealed')) revealObserver.observe(el);
+    });
 });
