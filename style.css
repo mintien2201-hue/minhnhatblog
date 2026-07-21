@@ -691,6 +691,12 @@ body {
 /* ====================
    LIGHTBOX
    ==================== */
+body.lightbox-open {
+    overflow: hidden;
+    position: fixed;
+    width: 100%;
+}
+
 .lightbox {
     position: fixed;
     inset: 0;

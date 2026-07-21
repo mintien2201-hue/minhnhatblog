@@ -78,7 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     body: JSON.stringify({ site: siteData, gallery: getGalleryData(), posts: getBlogData() })
                 });
             } catch {}
-        }, 800);
+        }, 3000);
     }
 
     function saveAllToLocal() {
@@ -226,23 +226,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     <button class="lightbox-close">✕</button>
                 `;
                 document.body.appendChild(ov);
-                document.body.style.overflow = 'hidden';
-                document.body.style.position = 'fixed';
-                document.body.style.top = '-' + window.scrollY + 'px';
-                document.body.style.width = '100%';
+                var savedScrollY = window.scrollY;
+                document.body.classList.add('lightbox-open');
                 var preventTouch = function(ev) { ev.preventDefault(); };
                 ov.addEventListener('touchmove', preventTouch, { passive: false });
                 setTimeout(() => ov.classList.add('active'), 10);
-                var savedScrollY = window.scrollY;
                 const close = () => {
                     ov.classList.remove('active');
                     ov.removeEventListener('touchmove', preventTouch);
                     setTimeout(() => {
                         ov.remove();
-                        document.body.style.overflow = '';
-                        document.body.style.position = '';
-                        document.body.style.top = '';
-                        document.body.style.width = '';
+                        document.body.classList.remove('lightbox-open');
                         window.scrollTo(0, savedScrollY);
                     }, 300);
                 };
@@ -253,37 +247,60 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    fileInput.addEventListener('change', function() {
-        const file = this.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = async function(e) {
-            const dataUrl = e.target.result;
-            const base64Content = dataUrl.split(',')[1];
-            let src = dataUrl;
+    function compressImage(file, maxWidth, quality) {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    let w = img.width, h = img.height;
+                    if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
+                    canvas.width = w;
+                    canvas.height = h;
+                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                    canvas.toBlob(function(blob) {
+                        resolve(blob || file);
+                    }, 'image/jpeg', quality);
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    }
 
-            const auth = await ensureGithubToken();
-            if (auth) {
-                try {
-                    publishStatus.textContent = 'Dang tai anh len GitHub...';
-                    const filename = generateImageFilename(file.name);
-                    await ghUploadImage(auth.token, auth.repo, GH_UPLOAD_DIR + '/' + filename, base64Content);
-                    src = 'https://raw.githubusercontent.com/' + auth.repo + '/main/' + GH_UPLOAD_DIR + '/' + filename;
-                    publishStatus.textContent = '';
-                } catch (err) {
-                    console.warn('Loi tai anh len GitHub:', err.message);
-                    publishStatus.textContent = 'Loi tai anh. Anh se duoc tai len khi xuat ban.';
+    fileInput.addEventListener('change', async function() {
+        const files = Array.from(this.files);
+        if (!files.length) return;
+        const auth = await ensureGithubToken();
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            try {
+                publishStatus.textContent = 'Dang xu ly anh ' + (i + 1) + '/' + files.length + '...';
+                const compressed = await compressImage(file, 1200, 0.82);
+                const reader = new FileReader();
+                const dataUrl = await new Promise((res) => { reader.onload = (e) => res(e.target.result); reader.readAsDataURL(compressed); });
+                const base64Content = dataUrl.split(',')[1];
+                let src = dataUrl;
+                if (auth) {
+                    try {
+                        publishStatus.textContent = 'Dang tai anh ' + (i + 1) + '/' + files.length + ' len GitHub...';
+                        const filename = generateImageFilename(file.name);
+                        await ghUploadImage(auth.token, auth.repo, GH_UPLOAD_DIR + '/' + filename, base64Content);
+                        src = 'https://raw.githubusercontent.com/' + auth.repo + '/main/' + GH_UPLOAD_DIR + '/' + filename;
+                    } catch (err) {
+                        console.warn('Loi tai anh len GitHub:', err.message);
+                    }
                 }
-            } else {
-                publishStatus.textContent = 'Khong co GitHub Token. Anh luu tam thoi.';
-                setTimeout(() => { publishStatus.textContent = ''; }, 3000);
+                const data = getGalleryData();
+                data.push({ src: src, note: 'Ghi chu...' });
+                saveGalleryData(data); saveAllToLocal(); renderGallery();
+            } catch (err) {
+                console.warn('Loi xu ly anh:', err.message);
             }
-
-            const data = getGalleryData();
-            data.push({ src: src, note: 'Ghi chu...' });
-            saveGalleryData(data); saveAllToLocal(); renderGallery();
-        };
-        reader.readAsDataURL(file);
+        }
+        publishStatus.textContent = '';
+        setTimeout(() => { publishStatus.textContent = ''; }, 2000);
         this.value = '';
     });
 
@@ -632,9 +649,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // LOAD INITIAL DATA
     // =====================
     async function initData() {
-        const hasLocalGallery = !!localStorage.getItem(GALLERY_KEY);
-        const hasLocalPosts = !!localStorage.getItem(BLOG_KEY);
-
         try {
             const [siteRes, galRes, postRes] = await Promise.all([
                 fetch('content/site.json' + CACHE_BUST), fetch('content/gallery.json' + CACHE_BUST), fetch('content/posts.json' + CACHE_BUST)
@@ -653,22 +667,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (f && site[f] !== undefined) el.innerHTML = site[f];
             });
 
-            if (!hasLocalGallery) {
-                try { localStorage.setItem(GALLERY_KEY, JSON.stringify(gal)); } catch (e) { console.warn('Gallery qua lon:', e.message); }
-            }
-            if (!hasLocalPosts) {
-                try { localStorage.setItem(BLOG_KEY, JSON.stringify(posts)); } catch (e) { console.warn('Posts qua lon:', e.message); }
-            }
+            try { localStorage.setItem(GALLERY_KEY, JSON.stringify(gal)); } catch (e) { console.warn('Gallery qua lon:', e.message); }
+            try { localStorage.setItem(BLOG_KEY, JSON.stringify(posts)); } catch (e) { console.warn('Posts qua lon:', e.message); }
             try {
                 localStorage.setItem('blog_data', JSON.stringify({
                     ...Object.fromEntries(editables.map(el => [el.dataset.field, el.innerHTML]).filter(([k]) => k)),
-                    _gallery: hasLocalGallery ? getGalleryData() : gal,
-                    _posts: hasLocalPosts ? getBlogData() : posts
+                    _gallery: gal,
+                    _posts: posts
                 }));
             } catch (e) { console.warn('Data qua lon:', e.message); }
             renderGallery();
             renderBlog();
-            console.log('Da tai du lieu tu GitHub Pages');
+            console.log('Da tai du lieu tu server');
             return;
         } catch (e) {
             console.warn('Khong the tai tu JSON:', e.message);

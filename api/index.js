@@ -117,8 +117,6 @@ export default async function handler(req, res) {
         }
 
         if (pathname === '/api/logout' && req.method === 'POST') {
-            const cookies = parseCookies(req);
-            if (cookies.blog_token) sessions.delete(cookies.blog_token);
             res.setHeader('Set-Cookie', 'blog_token=; Path=/; HttpOnly; Max-Age=0');
             return res.status(200).json({ ok: true });
         }
