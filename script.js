@@ -61,6 +61,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // =====================
     // LOCAL STORAGE SAVE/LOAD
     // =====================
+    function stripBom(str) {
+        if (!str) return '';
+        return str.replace(/^\uFEFF/, '').replace(/\uFEFF/g, '');
+    }
+
+    function sanitizeHtml(html) {
+        return stripBom(html).replace(/<div><br><\/div>/gi, '\n').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, function(tag) {
+            return tag.toLowerCase() === '<br>' || tag.toLowerCase() === '<br/>' || tag.toLowerCase() === '<br />' ? '\n' : '';
+        });
+    }
+
     let persistTimer = null;
     function persistToServer() {
         clearTimeout(persistTimer);
@@ -69,7 +80,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const siteData = {};
                 editables.forEach(el => {
                     const f = el.dataset.field;
-                    if (f) siteData[f] = el.innerHTML;
+                    if (f) siteData[f] = stripBom(el.innerHTML);
                 });
                 await fetch('/api/save', {
                     method: 'POST',
@@ -85,7 +96,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const data = {};
         editables.forEach(el => {
             const field = el.dataset.field;
-            if (field) data[field] = el.innerHTML;
+            if (field) data[field] = stripBom(el.innerHTML);
         });
         data._gallery = getGalleryData();
         data._posts = getBlogData();
@@ -116,14 +127,14 @@ document.addEventListener('DOMContentLoaded', function() {
     window.addEventListener('beforeunload', function() {
         clearTimeout(persistTimer);
         if (isEditing) {
-            const siteData = {};
-            editables.forEach(el => {
-                const f = el.dataset.field;
-                if (f) siteData[f] = el.innerHTML;
-            });
-            try {
-                const xhr = new XMLHttpRequest();
-                xhr.open('POST', '/api/save', false);
+                const siteData = {};
+                editables.forEach(el => {
+                    const f = el.dataset.field;
+                    if (f) siteData[f] = stripBom(el.innerHTML);
+                });
+                try {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', '/api/save', false);
                 xhr.setRequestHeader('Content-Type', 'application/json');
                 xhr.withCredentials = true;
                 xhr.send(JSON.stringify({ site: siteData, gallery: getGalleryData(), posts: getBlogData() }));
@@ -207,7 +218,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 note.addEventListener('blur', function() {
                     const data = getGalleryData();
                     const idx = Array.from(galleryGrid.children).indexOf(item);
-                    if (data[idx]) { data[idx].note = this.innerHTML; saveGalleryData(data); saveAllToLocal(); }
+                    if (data[idx]) { data[idx].note = stripBom(this.innerHTML); saveGalleryData(data); saveAllToLocal(); }
                 });
             }
             item.addEventListener('click', function(e) {
@@ -359,9 +370,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 const data = getBlogData();
                 const idx = Array.from(blogGrid.children).indexOf(card);
                 if (data[idx]) {
-                    data[idx].date = card.querySelector('.card-date').innerHTML;
-                    data[idx].title = card.querySelector('h3').innerHTML;
-                    data[idx].content = card.querySelector('p').innerHTML;
+                    data[idx].date = stripBom(card.querySelector('.card-date').innerHTML);
+                    data[idx].title = stripBom(card.querySelector('h3').innerHTML);
+                    data[idx].content = stripBom(card.querySelector('p').innerHTML);
                     saveBlogData(data); saveAllToLocal();
                 }
             };
@@ -501,7 +512,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const siteData = {};
             editables.forEach(el => {
                 const f = el.dataset.field;
-                if (f) siteData[f] = el.innerHTML;
+                if (f) siteData[f] = stripBom(el.innerHTML);
             });
             const galleryData = getGalleryData();
             const postsData = getBlogData();
@@ -671,7 +682,7 @@ document.addEventListener('DOMContentLoaded', function() {
             try { localStorage.setItem(BLOG_KEY, JSON.stringify(posts)); } catch (e) { console.warn('Posts qua lon:', e.message); }
             try {
                 localStorage.setItem('blog_data', JSON.stringify({
-                    ...Object.fromEntries(editables.map(el => [el.dataset.field, el.innerHTML]).filter(([k]) => k)),
+                    ...Object.fromEntries(editables.map(el => [el.dataset.field, stripBom(el.innerHTML)]).filter(([k]) => k)),
                     _gallery: gal,
                     _posts: posts
                 }));

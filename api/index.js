@@ -44,8 +44,13 @@ function parseCookies(req) {
     const cookies = {};
     const cookieHeader = req.headers.cookie || '';
     cookieHeader.split(';').forEach(c => {
-        const [k, v] = c.trim().split('=');
-        if (k) cookies[k] = v;
+        const trimmed = c.trim();
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx > 0) {
+            const k = trimmed.substring(0, eqIdx).replace(/^\uFEFF/, '').trim();
+            const v = trimmed.substring(eqIdx + 1).replace(/^\uFEFF/, '').trim();
+            if (k) cookies[k] = v;
+        }
     });
     return cookies;
 }
@@ -63,6 +68,8 @@ async function githubUpdateFile(filePath, content, message) {
     let sha = null;
     const existing = await githubGetFile(filePath);
     if (existing) sha = existing.sha;
+
+    content = content.replace(/^\uFEFF/, '').replace(/\uFEFF/g, '');
 
     const body = {
         message: message,
@@ -87,6 +94,7 @@ async function githubUpdateFile(filePath, content, message) {
 async function parseBody(req) {
     let body = '';
     for await (const chunk of req) body += chunk;
+    body = body.replace(/^\uFEFF/, '');
     try { return JSON.parse(body); } catch { return body; }
 }
 
