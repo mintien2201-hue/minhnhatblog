@@ -26,7 +26,7 @@ html {
 }
 
 body {
-    font-family: 'Crimson Text', serif;
+    font-family: 'Crimson Text', 'Georgia', 'Times New Roman', serif;
     background: var(--bg-primary);
     color: var(--text-secondary);
     line-height: 1.8;
@@ -73,7 +73,7 @@ body {
 }
 
 .section-title {
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Oswald', 'Arial Narrow', 'Helvetica Neue', 'Arial', sans-serif;
     font-size: 2.8rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -102,7 +102,7 @@ body {
     color: var(--text-muted);
     font-style: italic;
     font-size: 1.05rem;
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
 }
 
 /* Divider */
@@ -208,7 +208,7 @@ body {
 }
 
 .artist-name {
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Oswald', 'Arial Narrow', 'Helvetica Neue', 'Arial', sans-serif;
     font-size: 3.5rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -219,7 +219,7 @@ body {
 }
 
 .artist-title {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
     font-size: 1.2rem;
     font-style: italic;
     color: var(--gold);
@@ -232,7 +232,7 @@ body {
     color: var(--text-muted);
     font-size: 1rem;
     font-style: italic;
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
 }
 
 /* Navigation */
@@ -249,7 +249,7 @@ body {
 .main-nav a {
     color: var(--text-secondary);
     text-decoration: none;
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Oswald', 'Arial Narrow', 'Helvetica Neue', 'Arial', sans-serif;
     text-transform: uppercase;
     letter-spacing: 3px;
     font-size: 0.75rem;
@@ -263,7 +263,7 @@ body {
 .main-nav a::before {
     content: '// ';
     color: var(--gold-dim);
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
     font-size: 0.7rem;
 }
 
@@ -308,7 +308,7 @@ body {
 .text-block p:first-child::first-letter {
     font-size: 3.2rem;
     font-weight: 700;
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Oswald', 'Arial Narrow', 'Helvetica Neue', 'Arial', sans-serif;
     color: var(--gold);
     float: left;
     line-height: 1;
@@ -333,7 +333,7 @@ body {
 
 .stat-number {
     display: block;
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Oswald', 'Arial Narrow', 'Helvetica Neue', 'Arial', sans-serif;
     font-size: 2.5rem;
     font-weight: 700;
     color: var(--gold);
@@ -346,7 +346,7 @@ body {
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 2px;
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Oswald', 'Arial Narrow', 'Helvetica Neue', 'Arial', sans-serif;
 }
 
 /* ====================
@@ -401,7 +401,7 @@ body {
 }
 
 .gallery-note {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
     font-style: italic;
     font-size: 0.95rem;
     line-height: 1.6;
@@ -481,11 +481,11 @@ body {
     margin-bottom: 16px;
     font-style: italic;
     letter-spacing: 1px;
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
 }
 
 .blog-card h3 {
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Oswald', 'Arial Narrow', 'Helvetica Neue', 'Arial', sans-serif;
     font-size: 1.3rem;
     font-weight: 600;
     text-transform: uppercase;
@@ -505,7 +505,7 @@ body {
 .read-more {
     color: var(--gold);
     text-decoration: none;
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Oswald', 'Arial Narrow', 'Helvetica Neue', 'Arial', sans-serif;
     text-transform: uppercase;
     letter-spacing: 2px;
     font-size: 0.75rem;
@@ -567,7 +567,7 @@ body {
 .quote-section .container::after {
     content: '"';
     position: absolute;
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
     font-size: 6rem;
     color: var(--gold-dim);
     opacity: 0.15;
@@ -593,7 +593,7 @@ body {
 }
 
 .quote-block p {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
     font-size: 1.8rem;
     font-style: italic;
     font-weight: 400;
@@ -607,7 +607,7 @@ body {
     color: var(--gold-dim);
     font-style: normal;
     letter-spacing: 4px;
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Oswald', 'Arial Narrow', 'Helvetica Neue', 'Arial', sans-serif;
     text-transform: uppercase;
     font-weight: 500;
 }
@@ -648,7 +648,7 @@ body {
     transition: all 0.3s ease;
     font-size: 1rem;
     color: var(--text-secondary);
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
     border-radius: 4px;
 }
 
@@ -685,7 +685,7 @@ body {
     font-style: italic;
     color: var(--gold-dim);
     font-size: 0.8rem;
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
 }
 
 /* ====================
@@ -737,7 +737,7 @@ body {
 
 .lightbox-note {
     margin-top: 20px;
-    font-family: 'Playfair Display', serif;
+    font-family: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
     font-style: italic;
     font-size: 1.1rem;
     color: var(--text-primary);
@@ -989,7 +989,7 @@ body {
     background: var(--gold);
     color: var(--bg-primary);
     border: 1px solid var(--gold);
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Oswald', 'Arial Narrow', 'Helvetica Neue', 'Arial', sans-serif;
     text-transform: uppercase;
     letter-spacing: 2px;
     font-size: 0.75rem;
@@ -1012,7 +1012,7 @@ body {
 .publish-status {
     color: var(--text-muted);
     font-size: 0.75rem;
-    font-family: 'Crimson Text', serif;
+    font-family: 'Crimson Text', 'Georgia', 'Times New Roman', serif;
     font-style: italic;
     max-width: 180px;
     line-height: 1.3;
@@ -1072,7 +1072,7 @@ body {
     transition: all 0.3s ease;
     border-radius: 4px;
     color: var(--text-muted);
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Oswald', 'Arial Narrow', 'Helvetica Neue', 'Arial', sans-serif;
     text-transform: uppercase;
     letter-spacing: 2px;
     font-size: 0.85rem;
@@ -1199,7 +1199,7 @@ body {
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 .gh-modal-box h3 {
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Oswald', 'Arial Narrow', 'Helvetica Neue', 'Arial', sans-serif;
     font-size: 1.1rem;
     text-transform: uppercase;
     letter-spacing: 2px;
@@ -1211,7 +1211,7 @@ body {
     font-size: 0.85rem;
     color: var(--text-secondary);
     margin-bottom: 6px;
-    font-family: 'Crimson Text', serif;
+    font-family: 'Crimson Text', 'Georgia', 'Times New Roman', serif;
 }
 .gh-modal-box input {
     width: 100%;
@@ -1221,7 +1221,7 @@ body {
     border-radius: 4px;
     color: var(--text-primary);
     font-size: 16px;
-    font-family: 'Crimson Text', serif;
+    font-family: 'Crimson Text', 'Georgia', 'Times New Roman', serif;
     margin-bottom: 16px;
     outline: none;
     -webkit-appearance: none;
@@ -1236,7 +1236,7 @@ body {
 }
 .gh-modal-actions button {
     padding: 8px 20px;
-    font-family: 'Oswald', sans-serif;
+    font-family: 'Oswald', 'Arial Narrow', 'Helvetica Neue', 'Arial', sans-serif;
     font-size: 0.75rem;
     text-transform: uppercase;
     letter-spacing: 2px;
