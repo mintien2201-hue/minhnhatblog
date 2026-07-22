@@ -1,1 +1,21 @@
-{"name":"Phạm Minh Nhật","title":"Tattoo Artist","tagline":"\"Mỗi đường kim là một câu chuyện\"","about1":"Phạm Minh Nhật - Tattoo Artist với đam mê nghệ thuật xăm hình trên da. Mỗi tác phẩm là một câu chuyện riêng, được kể qua từng đường kim tỉ mỉ và đầy cảm xúc.","about2":"Với nhiều năm kinh nghiệm trong nghề, tôi cam kết mang đến cho khách hàng những tác phẩm chất lượng nhất, phù hợp với cá tính và câu chuyện của mỗi người.","stat1_num":"0","stat1_label":"Tác phẩm","stat2_num":"0","stat2_label":"Năm kinh nghiệm","stat3_num":"0","stat3_label":"Hài lòng","quote_text":"nghệ thuật xăm hình không chỉ là viết lên da mà là viết nên 1 câu chuyện","quote_author":"-Phạm minh nhật-","contact_address":"địa chỉ: 85/32 Trần Đình Xu, Cầu Ông Lãnh, quận 1.","contact_phone":"số điện thoại","contact_email":"email: pnhat8441@gmail.com","contact_instagram":"instagram: imnhat_tattooer","footer_text":"© 2026 Phạm Minh Nhật. All rights reserved.","footer_slogan":"Mỗi đường kim là một câu chuyện"}
+{
+  "name": "Phạm Minh Nhật",
+  "title": "Tattoo Artist",
+  "tagline": "\"Mỗi đường kim là một câu chuyện\"",
+  "about1": "Phạm Minh Nhật - Tattoo Artist với đam mê nghệ thuật xăm hình trên da. Mỗi tác phẩm là một câu chuyện riêng, được kể qua từng đường kim tỉ mỉ và đầy cảm xúc.",
+  "about2": "Với nhiều năm kinh nghiệm trong nghề, tôi cam kết mang đến cho khách hàng những tác phẩm chất lượng nhất, phù hợp với cá tính và câu chuyện của mỗi người.",
+  "stat1_num": "0",
+  "stat1_label": "Tác phẩm",
+  "stat2_num": "0",
+  "stat2_label": "Năm kinh nghiệm",
+  "stat3_num": "0",
+  "stat3_label": "Hài lòng",
+  "quote_text": "nghệ thuật xăm hình không chỉ là viết lên da mà là viết nên 1 câu chuyện",
+  "quote_author": "-Phạm minh nhật-",
+  "contact_address": "địa chỉ: 85/32 Trần Đình Xu, Cầu Ông Lãnh, quận 1.",
+  "contact_phone": "số điện thoại",
+  "contact_email": "email: pnhat8441@gmail.com",
+  "contact_instagram": "instagram: imnhat_tattooer",
+  "footer_text": "© 2026 Phạm Minh Nhật. All rights reserved.",
+  "footer_slogan": "Mỗi đường kim là một câu chuyện"
+}
