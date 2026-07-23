@@ -1,24 +1,21 @@
-document.addEventListener('DOMContentLoaded', function() {
+// ============================================================
+// Blog - Client Script
+// Tách biệt rõ: Public (chỉ xem) vs Admin (có quyền chỉnh sửa)
+// - Visitor: không thấy nút bút chì, không load GitHub token
+// - Admin (đã login): thấy nút bút chì, bật edit mode, xuất bản
+// Bảo mật: escape HTML trước khi render, xóa ảnh GitHub khi xóa
+// ============================================================
 
+document.addEventListener('DOMContentLoaded', function () {
+
+    let isAdmin = false;        // Chỉ true khi đã đăng nhập
     let isEditing = false;
-    const CACHE_BUST = '?v=' + Date.now();
 
-    // =====================
-    // LOGIN CHECK
-    // =====================
-    const adminControls = document.getElementById('adminControls');
-
-    fetch('/api/session').then(r => r.json()).then(data => {
-        if (data.loggedIn) {
-            adminControls.style.display = '';
-        } else {
-            adminControls.style.display = 'none';
-        }
-    }).catch(() => {
-        adminControls.style.display = 'none';
-    });
+    // Cache busting cố định theo version (không phải Date.now để giữ cache)
+    const CACHE_BUST = '?v=20260723';
 
     // DOM
+    const adminControls = document.getElementById('adminControls');
     const editBtn = document.getElementById('editToggle');
     const publishBtn = document.getElementById('publishBtn');
     const publishStatus = document.getElementById('publishStatus');
@@ -30,18 +27,85 @@ document.addEventListener('DOMContentLoaded', function() {
     let revealObserver;
 
     // =====================
-    // LOGOUT
+    // UTILITIES
     // =====================
-    logoutBtn.addEventListener('click', function() {
-        fetch('/api/logout', { method: 'POST' });
-        enableEditing(false);
+
+    // Escape HTML để chống XSS khi render nội dung user cung cấp
+    function escapeHtml(str) {
+        if (str == null) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function stripBom(str) {
+        if (!str) return '';
+        return str.replace(/^\uFEFF/, '').replace(/\uFEFF/g, '');
+    }
+
+    // Chuyển text thuần thành text node an toàn (không interpret HTML)
+    // contenteditable trả về HTML, ta dùng textContent để lấy text thuần
+    function getEditableText(el) {
+        const clone = el.cloneNode(true);
+        // Thay <br> và <div> bằng xuống dòng
+        clone.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+        clone.querySelectorAll('div').forEach(div => {
+            div.insertAdjacentText('beforebegin', '\n');
+        });
+        return stripBom(clone.textContent || '');
+    }
+
+    function sanitizeForDisplay(html) {
+        // Chỉ cho phép các thẻ an toàn, strip script/event handler
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        // Xóa script, style, iframe, object, embed
+        tmp.querySelectorAll('script, style, iframe, object, embed, link').forEach(el => el.remove());
+        // Xóa mọi event handler on*
+        tmp.querySelectorAll('*').forEach(el => {
+            [...el.attributes].forEach(attr => {
+                if (attr.name.startsWith('on')) el.removeAttribute(attr.name);
+            });
+        });
+        return tmp.innerHTML;
+    }
+
+    // =====================
+    // CHECK ADMIN SESSION
+    // =====================
+    fetch('/api/session').then(r => r.json()).then(data => {
+        if (data.loggedIn) {
+            isAdmin = true;
+            adminControls.style.display = '';
+        } else {
+            isAdmin = false;
+            adminControls.style.display = 'none';
+        }
+    }).catch(() => {
+        isAdmin = false;
         adminControls.style.display = 'none';
     });
 
     // =====================
-    // EDIT MODE
+    // LOGOUT
+    // =====================
+    logoutBtn.addEventListener('click', function () {
+        fetch('/api/logout', { method: 'POST' }).finally(() => {
+            isAdmin = false;
+            enableEditing(false);
+            adminControls.style.display = 'none';
+            window.location.href = 'index.html';
+        });
+    });
+
+    // =====================
+    // EDIT MODE (chỉ admin)
     // =====================
     function enableEditing(on) {
+        if (!isAdmin && on) return; // Không phải admin thì không cho bật
         isEditing = on;
         editables.forEach(el => el.setAttribute('contenteditable', on ? 'true' : 'false'));
         editBtn.textContent = on ? '✓' : '✏️';
@@ -52,36 +116,25 @@ document.addEventListener('DOMContentLoaded', function() {
         renderBlog();
     }
 
-    editBtn.addEventListener('click', function() {
-        fetch('/api/session').then(r => r.json()).then(data => {
-            if (!data.loggedIn) return;
-            enableEditing(!isEditing);
-        });
+    editBtn.addEventListener('click', function () {
+        if (!isAdmin) return;
+        enableEditing(!isEditing);
     });
 
     // =====================
-    // LOCAL STORAGE SAVE/LOAD
+    // LOCAL STORAGE (cache tạm, không phải DB thật)
     // =====================
-    function stripBom(str) {
-        if (!str) return '';
-        return str.replace(/^\uFEFF/, '').replace(/\uFEFF/g, '');
-    }
-
-    function sanitizeHtml(html) {
-        return stripBom(html).replace(/<div><br><\/div>/gi, '\n').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, function(tag) {
-            return tag.toLowerCase() === '<br>' || tag.toLowerCase() === '<br/>' || tag.toLowerCase() === '<br />' ? '\n' : '';
-        });
-    }
-
     let persistTimer = null;
+
     function persistToServer() {
+        if (!isAdmin) return; // Chỉ admin mới persist
         clearTimeout(persistTimer);
         persistTimer = setTimeout(async () => {
             try {
                 const siteData = {};
                 editables.forEach(el => {
                     const f = el.dataset.field;
-                    if (f) siteData[f] = stripBom(el.innerHTML);
+                    if (f) siteData[f] = getEditableText(el);
                 });
                 await fetch('/api/save', {
                     method: 'POST',
@@ -97,7 +150,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const data = {};
         editables.forEach(el => {
             const field = el.dataset.field;
-            if (field) data[field] = stripBom(el.innerHTML);
+            if (field) data[field] = getEditableText(el);
         });
         data._gallery = getGalleryData();
         data._posts = getBlogData();
@@ -111,31 +164,31 @@ document.addEventListener('DOMContentLoaded', function() {
             if (!saved) return false;
             editables.forEach(el => {
                 const field = el.dataset.field;
-                if (field && saved[field] !== undefined) el.innerHTML = saved[field];
+                if (field && saved[field] !== undefined) el.innerHTML = sanitizeForDisplay(saved[field]);
             });
             if (saved._gallery) { saveGalleryData(saved._gallery); renderGallery(); }
             if (saved._posts) { saveBlogData(saved._posts); renderBlog(); }
             return true;
-        } catch (e) { return false; }
+        } catch { return false; }
     }
 
-    document.addEventListener('input', function(e) {
+    document.addEventListener('input', function (e) {
         if (e.target.getAttribute('contenteditable') === 'true') {
             saveAllToLocal();
         }
     });
 
-    window.addEventListener('beforeunload', function() {
+    window.addEventListener('beforeunload', function () {
         clearTimeout(persistTimer);
-        if (isEditing) {
-                const siteData = {};
-                editables.forEach(el => {
-                    const f = el.dataset.field;
-                    if (f) siteData[f] = stripBom(el.innerHTML);
-                });
-                try {
-                    const xhr = new XMLHttpRequest();
-                    xhr.open('POST', '/api/save', false);
+        if (isEditing && isAdmin) {
+            const siteData = {};
+            editables.forEach(el => {
+                const f = el.dataset.field;
+                if (f) siteData[f] = getEditableText(el);
+            });
+            try {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', '/api/save', false);
                 xhr.setRequestHeader('Content-Type', 'application/json');
                 xhr.withCredentials = true;
                 xhr.send(JSON.stringify({ site: siteData, gallery: getGalleryData(), posts: getBlogData() }));
@@ -143,16 +196,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Fix #3: visibilitychange for mobile browsers that kill pages without beforeunload
-    document.addEventListener('visibilitychange', function() {
-        if (document.hidden && isEditing) {
-            saveAllToLocal();
-        }
+    document.addEventListener('visibilitychange', function () {
+        if (document.hidden && isEditing) saveAllToLocal();
     });
 
-    // Periodic auto-save every 15 seconds for mobile safety
-    setInterval(function() {
-        if (isEditing) saveAllToLocal();
+    setInterval(function () {
+        if (isEditing && isAdmin) saveAllToLocal();
     }, 15000);
 
     // =====================
@@ -168,6 +217,7 @@ document.addEventListener('DOMContentLoaded', function() {
         localStorage.setItem(GALLERY_KEY, JSON.stringify(data));
     }
 
+    // Render gallery - dùng textContent cho note để chống XSS
     function renderGallery() {
         const data = getGalleryData();
         galleryGrid.innerHTML = '';
@@ -178,20 +228,39 @@ document.addEventListener('DOMContentLoaded', function() {
             div.setAttribute('data-reveal', '');
             div.setAttribute('data-reveal-delay', String((i % 4 + 1) * 100));
             if (revealObserver) revealObserver.observe(div);
-            div.innerHTML = `
-                <img src="${item.src}" alt="Tac pham" loading="lazy">
-                <div class="gallery-overlay">
-                    <span class="gallery-note" contenteditable="${isEditing}">${item.note || ''}</span>
-                </div>
-                <button class="item-delete" data-type="gallery" title="Xoa">✕</button>
-            `;
+
+            const img = document.createElement('img');
+            img.src = escapeHtml(item.src || '');
+            img.alt = 'Tác phẩm';
+            img.loading = 'lazy';
+            div.appendChild(img);
+
+            const overlay = document.createElement('div');
+            overlay.className = 'gallery-overlay';
+            const note = document.createElement('span');
+            note.className = 'gallery-note';
+            note.setAttribute('contenteditable', isEditing ? 'true' : 'false');
+            note.textContent = item.note || ''; // textContent = chống XSS
+            overlay.appendChild(note);
+            div.appendChild(overlay);
+
+            if (isEditing) {
+                const del = document.createElement('button');
+                del.className = 'item-delete';
+                del.textContent = '✕';
+                del.title = 'Xóa';
+                div.appendChild(del);
+            }
             galleryGrid.appendChild(div);
         });
-        const add = document.createElement('div');
-        add.className = 'add-btn add-btn-gallery';
-        add.textContent = '+ Them tac pham';
-        add.addEventListener('click', () => fileInput.click());
-        galleryGrid.appendChild(add);
+
+        if (isEditing) {
+            const add = document.createElement('div');
+            add.className = 'add-btn add-btn-gallery';
+            add.textContent = '+ Thêm tác phẩm';
+            add.addEventListener('click', () => fileInput.click());
+            galleryGrid.appendChild(add);
+        }
         attachGalleryEvents();
     }
 
@@ -199,82 +268,121 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('#gallery-grid .gallery-item').forEach(item => {
             const del = item.querySelector('.item-delete');
             if (del) {
-                del.addEventListener('click', function(e) {
+                del.addEventListener('click', async function (e) {
                     e.stopPropagation();
                     const data = getGalleryData();
                     const idx = Array.from(galleryGrid.children).indexOf(item);
                     if (idx > -1) {
                         const removed = data[idx];
                         if (removed && removed.src) {
+                            // Nếu ảnh trên GitHub → thêm vào danh sách xóa
                             if (removed.src.startsWith('https://raw.githubusercontent.com/')) {
                                 const repoPath = extractGitHubPath(removed.src);
-                                if (repoPath) addDeletedFile(repoPath);
-                            } else if (!removed.src.startsWith('data:') && removed.src) {
-                                addDeletedFile(removed.src);
+                                if (repoPath) {
+                                    addDeletedFile(repoPath);
+                                    // Xóa ngay trên GitHub
+                                    const auth = await ensureGithubToken();
+                                    if (auth) {
+                                        try {
+                                            await ghDeleteFile(auth.token, auth.repo, repoPath);
+                                        } catch (err) {
+                                            console.warn('Không xóa được ảnh trên GitHub:', err.message);
+                                        }
+                                    }
+                                }
                             }
                         }
-                        data.splice(idx, 1); saveGalleryData(data); saveAllToLocal(); renderGallery();
+                        data.splice(idx, 1);
+                        saveGalleryData(data);
+                        saveAllToLocal();
+                        renderGallery();
                     }
                 });
             }
             const note = item.querySelector('.gallery-note');
             if (note) {
-                note.addEventListener('blur', function() {
+                note.addEventListener('blur', function () {
                     const data = getGalleryData();
                     const idx = Array.from(galleryGrid.children).indexOf(item);
-                    if (data[idx]) { data[idx].note = stripBom(this.innerHTML); saveGalleryData(data); saveAllToLocal(); }
+                    if (data[idx]) {
+                        data[idx].note = stripBom(this.textContent); // textContent an toàn
+                        saveGalleryData(data);
+                        saveAllToLocal();
+                    }
                 });
             }
-            item.addEventListener('click', function(e) {
+            item.addEventListener('click', function (e) {
                 if (e.target.closest('.item-delete') || e.target.getAttribute('contenteditable') === 'true') return;
                 const img = this.querySelector('img');
-                const note = this.querySelector('.gallery-note');
+                const noteEl = this.querySelector('.gallery-note');
                 if (!img) return;
-                const ov = document.createElement('div');
-                ov.className = 'lightbox';
-                ov.innerHTML = `
-                    <div class="lightbox-bg"></div>
-                    <div class="lightbox-content">
-                        <img src="${img.src}" alt="" class="lightbox-img">
-                        <div class="lightbox-note">${note ? note.innerHTML : ''}</div>
-                    </div>
-                    <button class="lightbox-close">✕</button>
-                `;
-                document.body.appendChild(ov);
-                var savedScrollY = window.scrollY;
-                document.body.classList.add('lightbox-open');
-                var preventTouch = function(ev) { ev.preventDefault(); };
-                ov.addEventListener('touchmove', preventTouch, { passive: false });
-                setTimeout(() => ov.classList.add('active'), 10);
-                const close = () => {
-                    ov.classList.remove('active');
-                    ov.removeEventListener('touchmove', preventTouch);
-                    setTimeout(() => {
-                        ov.remove();
-                        document.body.classList.remove('lightbox-open');
-                        window.scrollTo(0, savedScrollY);
-                    }, 300);
-                };
-                ov.querySelector('.lightbox-close').addEventListener('click', close);
-                ov.addEventListener('click', function(e) { if (e.target === this) close(); });
-                document.addEventListener('keydown', function h(e) { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', h); } });
+                openLightbox(img.src, noteEl ? noteEl.textContent : '');
             });
         });
     }
 
+    function openLightbox(src, note) {
+        const ov = document.createElement('div');
+        ov.className = 'lightbox';
+        const bg = document.createElement('div');
+        bg.className = 'lightbox-bg';
+        const content = document.createElement('div');
+        content.className = 'lightbox-content';
+        const img = document.createElement('img');
+        img.src = src;
+        img.alt = '';
+        img.className = 'lightbox-img';
+        content.appendChild(img);
+        if (note) {
+            const noteDiv = document.createElement('div');
+            noteDiv.className = 'lightbox-note';
+            noteDiv.textContent = note; // textContent chống XSS
+            content.appendChild(noteDiv);
+        }
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'lightbox-close';
+        closeBtn.textContent = '✕';
+        ov.appendChild(bg);
+        ov.appendChild(content);
+        ov.appendChild(closeBtn);
+        document.body.appendChild(ov);
+        const savedScrollY = window.scrollY;
+        document.body.classList.add('lightbox-open');
+        const preventTouch = function (ev) { ev.preventDefault(); };
+        ov.addEventListener('touchmove', preventTouch, { passive: false });
+        setTimeout(() => ov.classList.add('active'), 10);
+        const close = () => {
+            ov.classList.remove('active');
+            ov.removeEventListener('touchmove', preventTouch);
+            setTimeout(() => {
+                ov.remove();
+                document.body.classList.remove('lightbox-open');
+                window.scrollTo(0, savedScrollY);
+            }, 300);
+        };
+        closeBtn.addEventListener('click', close);
+        bg.addEventListener('click', close);
+        document.addEventListener('keydown', function h(e) {
+            if (e.key === 'Escape') { close(); document.removeEventListener('keydown', h); }
+        });
+    }
+
+    // =====================
+    // IMAGE UPLOAD + COMPRESS
+    // =====================
     function compressImage(file, maxWidth, quality) {
         return new Promise((resolve) => {
             const reader = new FileReader();
-            reader.onload = function(e) {
+            reader.onload = function (e) {
                 const img = new Image();
-                img.onload = function() {
+                img.onload = function () {
                     const canvas = document.createElement('canvas');
                     let w = img.width, h = img.height;
                     if (w > maxWidth) { h = Math.round(h * maxWidth / w); w = maxWidth; }
                     canvas.width = w;
                     canvas.height = h;
                     canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                    canvas.toBlob(function(blob) {
+                    canvas.toBlob(function (blob) {
                         resolve(blob || file);
                     }, 'image/jpeg', quality);
                 };
@@ -284,14 +392,15 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    fileInput.addEventListener('change', async function() {
+    fileInput.addEventListener('change', async function () {
+        if (!isAdmin) return;
         const files = Array.from(this.files);
         if (!files.length) return;
         const auth = await ensureGithubToken();
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             try {
-                publishStatus.textContent = 'Dang xu ly anh ' + (i + 1) + '/' + files.length + '...';
+                publishStatus.textContent = 'Đang xử lý ảnh ' + (i + 1) + '/' + files.length + '...';
                 const compressed = await compressImage(file, 1200, 0.82);
                 const reader = new FileReader();
                 const dataUrl = await new Promise((res) => { reader.onload = (e) => res(e.target.result); reader.readAsDataURL(compressed); });
@@ -299,19 +408,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 let src = dataUrl;
                 if (auth) {
                     try {
-                        publishStatus.textContent = 'Dang tai anh ' + (i + 1) + '/' + files.length + ' len GitHub...';
+                        publishStatus.textContent = 'Đang tải ảnh ' + (i + 1) + '/' + files.length + ' lên GitHub...';
                         const filename = generateImageFilename(file.name);
                         await ghUploadImage(auth.token, auth.repo, GH_UPLOAD_DIR + '/' + filename, base64Content);
                         src = 'https://raw.githubusercontent.com/' + auth.repo + '/main/' + GH_UPLOAD_DIR + '/' + filename;
                     } catch (err) {
-                        console.warn('Loi tai anh len GitHub:', err.message);
+                        console.warn('Lỗi tải ảnh lên GitHub:', err.message);
                     }
                 }
                 const data = getGalleryData();
-                data.push({ src: src, note: 'Ghi chu...' });
-                saveGalleryData(data); saveAllToLocal(); renderGallery();
+                data.push({ src: src, note: 'Ghi chú...' });
+                saveGalleryData(data);
+                saveAllToLocal();
+                renderGallery();
             } catch (err) {
-                console.warn('Loi xu ly anh:', err.message);
+                console.warn('Lỗi xử lý ảnh:', err.message);
             }
         }
         publishStatus.textContent = '';
@@ -320,7 +431,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // =====================
-    // BLOG
+    // BLOG POSTS
     // =====================
     const BLOG_KEY = 'blog_posts';
 
@@ -332,6 +443,7 @@ document.addEventListener('DOMContentLoaded', function() {
         localStorage.setItem(BLOG_KEY, JSON.stringify(data));
     }
 
+    // Render blog - dùng textContent cho nội dung để chống XSS
     function renderBlog() {
         const data = getBlogData();
         blogGrid.innerHTML = '';
@@ -341,24 +453,52 @@ document.addEventListener('DOMContentLoaded', function() {
             article.setAttribute('data-reveal', '');
             article.setAttribute('data-reveal-delay', String((i % 4 + 1) * 100));
             if (revealObserver) revealObserver.observe(article);
-            article.innerHTML = `
-                <div class="card-date" contenteditable="${isEditing}">${post.date || ''}</div>
-                <h3 contenteditable="${isEditing}">${post.title || ''}</h3>
-                <p contenteditable="${isEditing}">${post.content || ''}</p>
-                <a href="#" class="read-more">Doc tiep</a>
-                <button class="item-delete" title="Xoa">✕</button>
-            `;
+
+            const date = document.createElement('div');
+            date.className = 'card-date';
+            date.setAttribute('contenteditable', isEditing ? 'true' : 'false');
+            date.textContent = post.date || '';
+            article.appendChild(date);
+
+            const h3 = document.createElement('h3');
+            h3.setAttribute('contenteditable', isEditing ? 'true' : 'false');
+            h3.textContent = post.title || '';
+            article.appendChild(h3);
+
+            const p = document.createElement('p');
+            p.setAttribute('contenteditable', isEditing ? 'true' : 'false');
+            p.textContent = post.content || '';
+            article.appendChild(p);
+
+            const readMore = document.createElement('a');
+            readMore.href = '#';
+            readMore.className = 'read-more';
+            readMore.textContent = 'Đọc tiếp';
+            article.appendChild(readMore);
+
+            if (isEditing) {
+                const del = document.createElement('button');
+                del.className = 'item-delete';
+                del.textContent = '✕';
+                del.title = 'Xóa';
+                article.appendChild(del);
+            }
             blogGrid.appendChild(article);
         });
-        const add = document.createElement('div');
-        add.className = 'add-btn add-btn-blog';
-        add.textContent = '+ Them bai viet';
-        add.addEventListener('click', function() {
-            const data = getBlogData();
-            data.push({ date: 'Ngay thang', title: 'Tieu de', content: 'Noi dung...' });
-            saveBlogData(data); saveAllToLocal(); renderBlog();
-        });
-        blogGrid.appendChild(add);
+
+        if (isEditing) {
+            const add = document.createElement('div');
+            add.className = 'add-btn add-btn-blog';
+            add.textContent = '+ Thêm bài viết';
+            add.addEventListener('click', function () {
+                const data = getBlogData();
+                data.push({ date: 'Ngày tháng', title: 'Tiêu đề', content: 'Nội dung...' });
+                saveBlogData(data);
+                saveAllToLocal();
+                renderBlog();
+            });
+            blogGrid.appendChild(add);
+        }
         attachBlogEvents();
     }
 
@@ -366,21 +506,27 @@ document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('#blog-grid .blog-card').forEach(card => {
             const del = card.querySelector('.item-delete');
             if (del) {
-                del.addEventListener('click', function(e) {
+                del.addEventListener('click', function (e) {
                     e.stopPropagation();
                     const data = getBlogData();
                     const idx = Array.from(blogGrid.children).indexOf(card);
-                    if (idx > -1) { data.splice(idx, 1); saveBlogData(data); saveAllToLocal(); renderBlog(); }
+                    if (idx > -1) {
+                        data.splice(idx, 1);
+                        saveBlogData(data);
+                        saveAllToLocal();
+                        renderBlog();
+                    }
                 });
             }
-            const save = function() {
+            const save = function () {
                 const data = getBlogData();
                 const idx = Array.from(blogGrid.children).indexOf(card);
                 if (data[idx]) {
-                    data[idx].date = stripBom(card.querySelector('.card-date').innerHTML);
-                    data[idx].title = stripBom(card.querySelector('h3').innerHTML);
-                    data[idx].content = stripBom(card.querySelector('p').innerHTML);
-                    saveBlogData(data); saveAllToLocal();
+                    data[idx].date = stripBom(card.querySelector('.card-date').textContent);
+                    data[idx].title = stripBom(card.querySelector('h3').textContent);
+                    data[idx].content = stripBom(card.querySelector('p').textContent);
+                    saveBlogData(data);
+                    saveAllToLocal();
                 }
             };
             card.querySelector('.card-date')?.addEventListener('blur', save);
@@ -390,55 +536,47 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // =====================
-    // PUBLISH VIA GITHUB API
+    // GITHUB API (xuất bản + xóa ảnh)
     // =====================
     const GH_TOKEN_KEY = 'blog_gh_token';
     const GH_REPO_KEY = 'blog_gh_repo';
     const DELETED_FILES_KEY = 'blog_deleted_files';
+    const GH_UPLOAD_DIR = 'assets/uploads';
 
     function showGithubModal(step) {
         return new Promise((resolve) => {
             const overlay = document.createElement('div');
             overlay.className = 'gh-modal-overlay';
-            var label1 = step === 1 ? 'GitHub Token (PAT)' : 'Token da luu';
-            var label2 = step === 1 ? 'Ten repo (vd: username/repo)' : 'Ten repo (vd: username/repo)';
-            var val1 = step === 1 ? '' : (localStorage.getItem(GH_TOKEN_KEY) || '');
+            const label1 = step === 1 ? 'GitHub Token (PAT)' : 'Token đã lưu';
+            const val1 = step === 1 ? '' : (localStorage.getItem(GH_TOKEN_KEY) || '');
             overlay.innerHTML = `
                 <div class="gh-modal-box">
-                    <h3>${step === 1 ? 'Nhap thong tin GitHub' : 'Xac nhan GitHub'}</h3>
+                    <h3>${step === 1 ? 'Nhập thông tin GitHub' : 'Xác nhận GitHub'}</h3>
                     <label>${label1}</label>
-                    <input type="text" class="gh-modal-token" value="${val1}" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off" autocorrect="off" spellcheck="false">
-                    <label>${label2}</label>
-                    <input type="text" class="gh-modal-repo" value="${localStorage.getItem(GH_REPO_KEY) || ''}" placeholder="username/repo" autocomplete="off">
+                    <input type="text" class="gh-modal-token" value="${escapeHtml(val1)}" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off" autocorrect="off" spellcheck="false">
+                    <label>Tên repo (vd: username/repo)</label>
+                    <input type="text" class="gh-modal-repo" value="${escapeHtml(localStorage.getItem(GH_REPO_KEY) || '')}" placeholder="username/repo" autocomplete="off">
                     <div class="gh-modal-actions">
-                        <button class="gh-modal-cancel">Huy</button>
-                        <button class="gh-modal-ok">Dong y</button>
+                        <button class="gh-modal-cancel">Hủy</button>
+                        <button class="gh-modal-ok">Đồng ý</button>
                     </div>
                 </div>
             `;
             document.body.appendChild(overlay);
             overlay.querySelector('.gh-modal-token').focus();
-            var close = (result) => { overlay.remove(); resolve(result); };
-            overlay.querySelector('.gh-modal-ok').addEventListener('click', () => {
-                var token = overlay.querySelector('.gh-modal-token').value.trim();
-                var repo = overlay.querySelector('.gh-modal-repo').value.trim();
+            const close = (result) => { overlay.remove(); resolve(result); };
+            const submit = () => {
+                const token = overlay.querySelector('.gh-modal-token').value.trim();
+                const repo = overlay.querySelector('.gh-modal-repo').value.trim();
                 if (!token || !repo) { overlay.remove(); resolve(null); return; }
                 localStorage.setItem(GH_TOKEN_KEY, token);
                 localStorage.setItem(GH_REPO_KEY, repo);
                 close({ token, repo });
-            });
+            };
+            overlay.querySelector('.gh-modal-ok').addEventListener('click', submit);
             overlay.querySelector('.gh-modal-cancel').addEventListener('click', () => close(null));
-            overlay.addEventListener('click', function(e) { if (e.target === overlay) close(null); });
-            overlay.addEventListener('keydown', function(e) {
-                if (e.key === 'Enter') {
-                    var token = overlay.querySelector('.gh-modal-token').value.trim();
-                    var repo = overlay.querySelector('.gh-modal-repo').value.trim();
-                    if (!token || !repo) { overlay.remove(); resolve(null); return; }
-                    localStorage.setItem(GH_TOKEN_KEY, token);
-                    localStorage.setItem(GH_REPO_KEY, repo);
-                    close({ token, repo });
-                }
-            });
+            overlay.addEventListener('click', function (e) { if (e.target === overlay) close(null); });
+            overlay.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
         });
     }
 
@@ -459,8 +597,6 @@ document.addEventListener('DOMContentLoaded', function() {
         localStorage.removeItem(DELETED_FILES_KEY);
     }
 
-    const GH_UPLOAD_DIR = 'assets/uploads';
-
     function generateImageFilename(originalName) {
         const ext = (originalName.split('.').pop() || 'jpg').toLowerCase();
         return 'img_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8) + '.' + ext;
@@ -473,31 +609,43 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch { return null; }
     }
 
-    async function ghUploadImage(token, repo, path, base64Content) {
+    async function ghUploadImage(token, repo, ghPath, base64Content) {
         let sha = null;
         try {
-            const res = await fetch('https://api.github.com/repos/' + repo + '/contents/' + path, {
+            const res = await fetch('https://api.github.com/repos/' + repo + '/contents/' + ghPath, {
                 headers: { Authorization: 'token ' + token }
             });
             if (res.ok) { const d = await res.json(); sha = d.sha; }
         } catch {}
-
-        const body = {
-            message: 'Upload anh: ' + path.split('/').pop(),
-            content: base64Content,
-            branch: 'main'
-        };
+        const body = { message: 'Upload ảnh: ' + ghPath.split('/').pop(), content: base64Content, branch: 'main' };
         if (sha) body.sha = sha;
-
-        const res = await fetch('https://api.github.com/repos/' + repo + '/contents/' + path, {
+        const res = await fetch('https://api.github.com/repos/' + repo + '/contents/' + ghPath, {
             method: 'PUT',
             headers: { Authorization: 'token ' + token, 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
         });
-
         if (!res.ok) {
             const err = await res.json().catch(() => ({}));
-            throw new Error(err.message || 'Upload that bai [HTTP ' + res.status + ']');
+            throw new Error(err.message || 'Upload thất bại [HTTP ' + res.status + ']');
+        }
+    }
+
+    async function ghDeleteFile(token, repo, ghPath) {
+        const res = await fetch('https://api.github.com/repos/' + repo + '/contents/' + ghPath, {
+            headers: { Authorization: 'token ' + token }
+        });
+        if (res.status === 404) return;
+        if (!res.ok) throw new Error('Không lấy được sha của ' + ghPath + ' (HTTP ' + res.status + ')');
+        const d = await res.json();
+        const sha = d.sha;
+        const delRes = await fetch('https://api.github.com/repos/' + repo + '/contents/' + ghPath, {
+            method: 'DELETE',
+            headers: { Authorization: 'token ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: 'Xóa ' + ghPath, sha: sha, branch: 'main' })
+        });
+        if (!delRes.ok) {
+            const err = await delRes.json().catch(() => ({}));
+            throw new Error((err.message || 'Lỗi xóa') + ' [' + ghPath + ' - HTTP ' + delRes.status + ']');
         }
     }
 
@@ -505,21 +653,22 @@ document.addEventListener('DOMContentLoaded', function() {
         let token = localStorage.getItem(GH_TOKEN_KEY);
         let repo = localStorage.getItem(GH_REPO_KEY);
         if (token && repo) return { token, repo };
-
         const result = await showGithubModal(1);
         return result;
     }
 
+    // =====================
+    // PUBLISH
+    // =====================
     async function publishToGitHub() {
+        if (!isAdmin) return;
         publishBtn.disabled = true;
-
         try {
             saveAllToLocal();
-
             const siteData = {};
             editables.forEach(el => {
                 const f = el.dataset.field;
-                if (f) siteData[f] = stripBom(el.innerHTML);
+                if (f) siteData[f] = getEditableText(el);
             });
             const galleryData = getGalleryData();
             const postsData = getBlogData();
@@ -527,7 +676,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
             let token = localStorage.getItem(GH_TOKEN_KEY);
             let repo = localStorage.getItem(GH_REPO_KEY);
-
             if (!token || !repo) {
                 const result = await showGithubModal(2);
                 if (!result) { publishBtn.disabled = false; publishStatus.textContent = ''; return; }
@@ -539,10 +687,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const totalSteps = 2 + deletedFiles.length + pendingImages.length;
             let step = 0;
 
+            // Upload ảnh pending
             for (let i = 0; i < galleryData.length; i++) {
                 if (galleryData[i].src && galleryData[i].src.startsWith('data:')) {
                     step++;
-                    publishStatus.textContent = step + '/' + totalSteps + ' - Dang tai anh ' + (i + 1) + '/' + pendingImages.length + '...';
+                    publishStatus.textContent = step + '/' + totalSteps + ' - Đang tải ảnh ' + (i + 1) + '/' + pendingImages.length + '...';
                     const b64 = galleryData[i].src.split(',')[1];
                     const fname = generateImageFilename('img_' + i + '_' + Date.now() + '.jpg');
                     await ghUploadImage(token, repo, GH_UPLOAD_DIR + '/' + fname, b64);
@@ -551,7 +700,9 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             saveGalleryData(galleryData);
 
-            step++; publishStatus.textContent = step + '/' + totalSteps + ' - Dang luu vao GitHub...';
+            // Save content
+            step++;
+            publishStatus.textContent = step + '/' + totalSteps + ' - Đang lưu vào GitHub...';
             const res = await fetch('/api/save', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -559,57 +710,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({ site: siteData, gallery: galleryData, posts: postsData })
             });
             const result = await res.json();
-            if (!result.ok) throw new Error(result.error || 'Loi server');
+            if (!result.ok) throw new Error(result.error || 'Lỗi server');
 
+            // Xóa ảnh đã đánh dấu
             for (const file of deletedFiles) {
-                step++; publishStatus.textContent = step + '/' + totalSteps + ' - Dang xoa ' + file + '...';
+                step++;
+                publishStatus.textContent = step + '/' + totalSteps + ' - Đang xóa ' + file + '...';
                 try {
                     await ghDeleteFile(token, repo, file);
                 } catch (e) {
-                    console.warn('Khong xoa duoc ' + file + ':', e.message);
+                    console.warn('Không xóa được ' + file + ':', e.message);
                 }
             }
             clearDeletedFiles();
 
-            publishStatus.innerHTML = '✓ Da xuat ban thanh cong! <span style="opacity:0.6;font-size:0.7rem;margin-left:4px;">Reload trang de xem</span>';
-
+            publishStatus.innerHTML = '✓ Đã xuất bản thành công! <span style="opacity:0.6;font-size:0.7rem;margin-left:4px;">Reload trang để xem</span>';
             setTimeout(() => { publishStatus.textContent = ''; }, 6000);
-
         } catch (err) {
             console.error('Publish error:', err);
             let msg = err.message;
             if (err.message.includes('401') || err.message.includes('403')) {
                 localStorage.removeItem(GH_TOKEN_KEY);
-                msg = 'Token sai/het han. Hay nhap lai token moi.';
+                msg = 'Token sai/hết hạn. Hãy nhập lại token mới.';
             } else if (err.message.includes('404')) {
-                msg = 'Repo khong ton tai. Kiem tra lai ten repo (username/repo).';
+                msg = 'Repo không tồn tại. Kiểm tra lại tên repo (username/repo).';
             } else if (err.message.includes('422')) {
-                msg = 'File qua lon hoac bi trung. Thu giam kich thuoc anh.';
+                msg = 'File quá lớn hoặc bị trùng. Thử giảm kích thước ảnh.';
             } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
-                msg = 'Loi mang. Kiem tra ket noi internet.';
+                msg = 'Lỗi mạng. Kiểm tra kết nối internet.';
             }
-            publishStatus.innerHTML = '✗ Loi: ' + msg + ' <span style="opacity:0.6;font-size:0.7rem;margin-left:4px;">[F12 xem chi tiet]</span>';
+            publishStatus.innerHTML = '✗ Lỗi: ' + escapeHtml(msg) + ' <span style="opacity:0.6;font-size:0.7rem;margin-left:4px;">[F12 xem chi tiết]</span>';
         }
         publishBtn.disabled = false;
-    }
-
-    async function ghDeleteFile(token, repo, path) {
-        const res = await fetch('https://api.github.com/repos/' + repo + '/contents/' + path, {
-            headers: { Authorization: 'token ' + token }
-        });
-        if (res.status === 404) return;
-        if (!res.ok) throw new Error('Khong lay duoc sha cua ' + path + ' (HTTP ' + res.status + ')');
-        const d = await res.json();
-        const sha = d.sha;
-        const delRes = await fetch('https://api.github.com/repos/' + repo + '/contents/' + path, {
-            method: 'DELETE',
-            headers: { Authorization: 'token ' + token, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: 'Xoa ' + path, sha: sha, branch: 'main' })
-        });
-        if (!delRes.ok) {
-            const err = await delRes.json().catch(() => ({}));
-            throw new Error((err.message || 'Loi xoa') + ' [' + path + ' - HTTP ' + delRes.status + ']');
-        }
     }
 
     publishBtn.addEventListener('click', publishToGitHub);
@@ -620,12 +752,11 @@ document.addEventListener('DOMContentLoaded', function() {
     async function initData() {
         try {
             const [siteRes, galRes, postRes] = await Promise.all([
-                fetch('content/site.json' + CACHE_BUST), fetch('content/gallery.json' + CACHE_BUST), fetch('content/posts.json' + CACHE_BUST)
+                fetch('content/site.json' + CACHE_BUST),
+                fetch('content/gallery.json' + CACHE_BUST),
+                fetch('content/posts.json' + CACHE_BUST)
             ]);
-
-            if (!siteRes.ok) throw new Error('site.json HTTP ' + siteRes.status);
-            if (!galRes.ok) throw new Error('gallery.json HTTP ' + galRes.status);
-            if (!postRes.ok) throw new Error('posts.json HTTP ' + postRes.status);
+            if (!siteRes.ok || !galRes.ok || !postRes.ok) throw new Error('Load JSON failed');
 
             const site = await siteRes.json();
             const gal = await galRes.json();
@@ -633,46 +764,45 @@ document.addEventListener('DOMContentLoaded', function() {
 
             editables.forEach(el => {
                 const f = el.dataset.field;
-                if (f && site[f] !== undefined) el.innerHTML = site[f];
+                if (f && site[f] !== undefined) el.innerHTML = sanitizeForDisplay(site[f]);
             });
 
-            try { localStorage.setItem(GALLERY_KEY, JSON.stringify(gal)); } catch (e) { console.warn('Gallery qua lon:', e.message); }
-            try { localStorage.setItem(BLOG_KEY, JSON.stringify(posts)); } catch (e) { console.warn('Posts qua lon:', e.message); }
+            try { localStorage.setItem(GALLERY_KEY, JSON.stringify(gal)); } catch {}
+            try { localStorage.setItem(BLOG_KEY, JSON.stringify(posts)); } catch {}
             try {
                 localStorage.setItem('blog_data', JSON.stringify({
-                    ...Object.fromEntries(editables.map(el => [el.dataset.field, stripBom(el.innerHTML)]).filter(([k]) => k)),
+                    ...Object.fromEntries(editables.map(el => [el.dataset.field, getEditableText(el)]).filter(([k]) => k)),
                     _gallery: gal,
                     _posts: posts
                 }));
-            } catch (e) { console.warn('Data qua lon:', e.message); }
+            } catch {}
             renderGallery();
             renderBlog();
-            console.log('Da tai du lieu tu server');
+            console.log('Đã tải dữ liệu từ server');
             return;
         } catch (e) {
-            console.warn('Khong the tai tu JSON:', e.message);
+            console.warn('Không thể tải từ JSON:', e.message);
         }
 
         if (loadFromLocal()) {
-            console.log('Su du lieu tu localStorage');
+            console.log('Sử dụng dữ liệu từ localStorage');
             renderGallery();
             renderBlog();
             return;
         }
 
         saveGalleryData([
-            { src: '473057845_1324967375323197_7691148311523062675_n.jpg', note: 'Ghi chu ve hinh xam nay...' },
-            { src: '504265715_1430961278057139_4805018946062274658_n.jpg', note: 'Ghi chu ve hinh xam nay...' },
-            { src: '491459297_18017679221700444_2378959171536059656_n.jpg', note: 'Ghi chu ve hinh xam nay...' },
-            { src: '605118719_1586492995837299_3830246236406655843_n.jpg', note: 'Ghi chu ve hinh xam nay...' },
-            { src: '592877601_2682534062088980_2711140852549492742_n.jpg', note: 'Ghi chu ve hinh xam nay...' },
-            { src: '672171537_1674591990360732_9109967491958179765_n.jpg', note: 'Ghi chu ve hinh xam nay...' },
-            { src: '476312251_1343620190124582_4690998580177942908_n.jpg', note: 'Ghi chu ve hinh xam nay...' }
+            { src: '473057845_1324967375323197_7691148311523062675_n.jpg', note: 'Ghi chú về hình xăm này...' },
+            { src: '504265715_1430961278057139_4805018946062274658_n.jpg', note: 'Ghi chú về hình xăm này...' },
+            { src: '491459297_18017679221700444_2378959171536059656_n.jpg', note: 'Ghi chú về hình xăm này...' },
+            { src: '605118719_1586492995837299_3830246236406655843_n.jpg', note: 'Ghi chú về hình xăm này...' },
+            { src: '592877601_2682534062088980_2711140852549492742_n.jpg', note: 'Ghi chú về hình xăm này...' },
+            { src: '672171537_1674591990360732_9109967491958179765_n.jpg', note: 'Ghi chú về hình xăm này...' }
         ]);
         saveBlogData([
-            { date: 'Ngay thang', title: 'Tieu de bai viet 1', content: 'Noi dung...' },
-            { date: 'Ngay thang', title: 'Tieu de bai viet 2', content: 'Noi dung...' },
-            { date: 'Ngay thang', title: 'Tieu de bai viet 3', content: 'Noi dung...' }
+            { date: 'Ngày tháng', title: 'Tiêu đề bài viết 1', content: 'Nội dung...' },
+            { date: 'Ngày tháng', title: 'Tiêu đề bài viết 2', content: 'Nội dung...' },
+            { date: 'Ngày tháng', title: 'Tiêu đề bài viết 3', content: 'Nội dung...' }
         ]);
         renderGallery();
         renderBlog();
@@ -681,21 +811,19 @@ document.addEventListener('DOMContentLoaded', function() {
     initData();
 
     // =====================
-    // EFFECTS
+    // EFFECTS (scroll reveal, parallax, counter)
     // =====================
-
-    // Fix #9: Custom smooth scroll for iOS Safari
     function smoothScrollTo(target) {
-        var targetY = target.getBoundingClientRect().top + window.pageYOffset - 80;
-        var startY = window.pageYOffset;
-        var diff = targetY - startY;
+        const targetY = target.getBoundingClientRect().top + window.pageYOffset - 80;
+        const startY = window.pageYOffset;
+        const diff = targetY - startY;
         if (Math.abs(diff) < 1) return;
-        var duration = Math.min(Math.abs(diff) * 0.4, 800);
-        var start = null;
+        const duration = Math.min(Math.abs(diff) * 0.4, 800);
+        let start = null;
         function step(ts) {
             if (!start) start = ts;
-            var progress = Math.min((ts - start) / duration, 1);
-            var ease = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+            const progress = Math.min((ts - start) / duration, 1);
+            const ease = progress < 0.5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
             window.scrollTo(0, startY + diff * ease);
             if (progress < 1) window.requestAnimationFrame(step);
         }
@@ -703,7 +831,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     document.querySelectorAll('.main-nav a[href^="#"]').forEach(link => {
-        link.addEventListener('click', function(e) {
+        link.addEventListener('click', function (e) {
             e.preventDefault();
             const t = document.querySelector(this.getAttribute('href'));
             if (t) smoothScrollTo(t);
@@ -717,9 +845,11 @@ document.addEventListener('DOMContentLoaded', function() {
         sections.forEach(s => {
             const top = s.offsetTop, h = s.offsetHeight, id = s.getAttribute('id');
             navLinks.forEach(l => {
-                l.style.color = ''; l.style.borderColor = '';
+                l.style.color = '';
+                l.style.borderColor = '';
                 if (l.getAttribute('href') === `#${id}` && sy >= top && sy < top + h) {
-                    l.style.color = 'var(--gold)'; l.style.borderColor = 'var(--gold)';
+                    l.style.color = 'var(--gold)';
+                    l.style.borderColor = 'var(--gold)';
                 }
             });
         });

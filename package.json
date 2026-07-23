@@ -2,5 +2,9 @@
     "name": "minhnhatblog",
     "version": "1.0.0",
     "type": "module",
-    "private": true
+    "private": true,
+    "scripts": {
+        "dev": "node server.js",
+        "start": "node server.js"
+    }
 }

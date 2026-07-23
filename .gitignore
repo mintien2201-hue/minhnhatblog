@@ -3,12 +3,17 @@ node_modules/
 Thumbs.db
 *.log
 
+# Env files (BẮT BUỘC - chứa mật khẩu, token)
+.env
+.env.local
+.env.production
+.env.development
+*.env
+
 # Backup và file nhạy cảm
 *.backup
 *.bak
 *.tmp
-.env
-.env.local
 config.local.js
 secrets.json
 

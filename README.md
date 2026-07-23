@@ -4,28 +4,46 @@ Website portfolio cá nhân với tính năng chỉnh sửa trực tiếp và xu
 
 ## Tính năng
 
-- ✏️ Chỉnh sửa nội dung trực tiếp trên trang web
-- 🖼️ Quản lý gallery hình ảnh
-- 📝 Quản lý bài viết blog
-- 🔒 Bảo vệ bằng mật khẩu
+- ✏️ Chỉnh sửa nội dung trực tiếp trên trang web (chỉ admin)
+- 🖼️ Quản lý gallery hình ảnh (upload lên GitHub, tự nén ảnh)
+- 📝 Quản lý bài viết blog (thêm/sửa/xóa)
+- 🔒 Bảo vệ bằng mật khẩu + JWT
 - 🚀 Xuất bản lên GitHub Pages tự động
+- 🗑️ Xóa ảnh trên GitHub khi xóa khỏi gallery (không rác)
+- 👥 Phân biệt: visitor (chỉ xem) vs admin (có nút bút chì chỉnh sửa)
 
 ## Cách sử dụng
 
-### 1. Mở trang web
-Mở file `index.html` trong trình duyệt hoặc truy cập trang GitHub Pages của bạn.
+### 1. Chạy local (dev)
+```bash
+# Cài env
+cp .env.example .env
+# Sửa .env: SITE_PASSWORD, JWT_SECRET, GITHUB_TOKEN, GITHUB_REPO
 
-### 2. Chỉnh sửa nội dung
-1. Click nút 🔒 ở góc phải dưới
-2. Nhập mật khẩu (mặc định: `123456`)
-3. Click vào bất kỳ nội dung nào để chỉnh sửa
-4. Thêm/xóa hình ảnh và bài viết
+# Chạy
+npm run dev
+# → http://localhost:3000
+```
 
-### 3. Xuất bản lên GitHub
-1. Click nút "Xuất bản lên GitHub"
-2. Lần đầu tiên sẽ yêu cầu:
-   - GitHub Personal Access Token
-   - Tên repository (vd: `username/repo`)
+### 2. Trang người xem
+- Vào `http://localhost:3000` → xem nội dung
+- Không thấy nút bút chì, không thể chỉnh sửa
+
+### 3. Trang admin
+- Vào `http://localhost:3000/login.html`
+- Nhập mật khẩu → chuyển về trang chủ
+- Góc phải dưới hiện nút **✏️** → click để bật edit mode
+- Sửa nội dung → click **Xuất bản** để lưu lên GitHub
+
+### 4. Deploy lên Vercel
+1. Push code lên GitHub
+2. Vào Vercel → New Project → import repo
+3. Environment Variables (bắt buộc):
+   - `SITE_PASSWORD` — mật khẩu admin
+   - `JWT_SECRET` — random string ≥32 ký tự
+   - `GITHUB_TOKEN` — PAT có scope `repo`
+   - `GITHUB_REPO` — dạng `username/repo`
+   - `NEXT_PUBLIC_SITE_URL` — URL Vercel (vd `https://blogcanhan.vercel.app`)
 
 ## 🔐 BẢO MẬT QUAN TRỌNG
 
