@@ -33,3 +33,4 @@ secrets.json
 Thumbs.db
 desktop.ini
 .vercel
+.env*
