@@ -124,28 +124,6 @@ document.addEventListener('DOMContentLoaded', function () {
     // =====================
     // LOCAL STORAGE (cache tạm, không phải DB thật)
     // =====================
-    let persistTimer = null;
-
-    function persistToServer() {
-        if (!isAdmin) return; // Chỉ admin mới persist
-        clearTimeout(persistTimer);
-        persistTimer = setTimeout(async () => {
-            try {
-                const siteData = {};
-                editables.forEach(el => {
-                    const f = el.dataset.field;
-                    if (f) siteData[f] = getEditableText(el);
-                });
-                await fetch('/api/save', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    credentials: 'include',
-                    body: JSON.stringify({ site: siteData, gallery: getGalleryData(), posts: getBlogData() })
-                });
-            } catch {}
-        }, 3000);
-    }
-
     function saveAllToLocal() {
         const data = {};
         editables.forEach(el => {
@@ -155,7 +133,6 @@ document.addEventListener('DOMContentLoaded', function () {
         data._gallery = getGalleryData();
         data._posts = getBlogData();
         try { localStorage.setItem('blog_data', JSON.stringify(data)); } catch {}
-        persistToServer();
     }
 
     function loadFromLocal() {
@@ -179,30 +156,15 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     window.addEventListener('beforeunload', function () {
-        clearTimeout(persistTimer);
-        if (isEditing && isAdmin) {
-            const siteData = {};
-            editables.forEach(el => {
-                const f = el.dataset.field;
-                if (f) siteData[f] = getEditableText(el);
-            });
-            try {
-                const xhr = new XMLHttpRequest();
-                xhr.open('POST', '/api/save', false);
-                xhr.setRequestHeader('Content-Type', 'application/json');
-                xhr.withCredentials = true;
-                xhr.send(JSON.stringify({ site: siteData, gallery: getGalleryData(), posts: getBlogData() }));
-            } catch {}
-        }
+        // Chỉ lưu localStorage (cache local) — không gọi API để tránh race condition với nút Xuất bản
+        if (isEditing && isAdmin) saveAllToLocal();
     });
 
     document.addEventListener('visibilitychange', function () {
         if (document.hidden && isEditing) saveAllToLocal();
     });
 
-    setInterval(function () {
-        if (isEditing && isAdmin) saveAllToLocal();
-    }, 15000);
+    // (Đã bỏ auto-save 15s — chỉ lưu khi bấm Xuất bản để tránh xung đột GitHub sha)
 
     // =====================
     // GALLERY
@@ -684,8 +646,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const pendingImages = galleryData.filter(item => item.src && item.src.startsWith('data:'));
-            const totalSteps = 2 + deletedFiles.length + pendingImages.length;
+            const totalSteps = 1 + deletedFiles.length + pendingImages.length;
             let step = 0;
+            publishStatus.textContent = pendingImages.length > 0 ? 'Đang chuẩn bị...' : 'Đang lưu vào GitHub...';
 
             // Upload ảnh pending
             for (let i = 0; i < galleryData.length; i++) {

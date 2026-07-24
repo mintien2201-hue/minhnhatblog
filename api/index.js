@@ -83,20 +83,27 @@ async function ghFetch(method, ghPath, body) {
 
 async function ghSave(ghPath, content, message) {
     content = clean(content);
-    let sha = undefined;
-    const existing = await ghFetch('GET', ghPath).catch(() => undefined);
-    const existingJson = existing ? await existing.json().catch(() => undefined) : undefined;
-    if (existingJson && existingJson.sha) sha = existingJson.sha;
-
     const body = {
         message: clean(message),
         content: Buffer.from(content, 'utf-8').toString('base64'),
         branch: 'main'
     };
-    if (sha) body.sha = sha;
 
-    const res = await ghFetch('PUT', ghPath, body);
-    if (!res.ok) {
+    // Retry khi gặp 409 (race condition giữa các request /api/save đồng thời)
+    for (let attempt = 0; attempt < 3; attempt++) {
+        let sha = undefined;
+        const existing = await ghFetch('GET', ghPath).catch(() => undefined);
+        const existingJson = existing ? await existing.json().catch(() => undefined) : undefined;
+        if (existingJson && existingJson.sha) sha = existingJson.sha;
+        if (sha) body.sha = sha; else delete body.sha;
+
+        const res = await ghFetch('PUT', ghPath, body);
+        if (res.ok) return;
+        // 409 = sha cũ do có commit mới xen vào → lấy lại sha và thử lại
+        if (res.status === 409 && attempt < 2) {
+            await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
+            continue;
+        }
         const err = await res.json().catch(() => ({}));
         throw new Error(clean(err.message) || 'GitHub error ' + res.status);
     }
