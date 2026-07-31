@@ -1,5 +1,5 @@
 {
-  "name": "Test",
+  "name": "Nhập tên",
   "title": "nghề nghiệp",
   "tagline": "câu nói của bạn(slogan)\n\n",
   "about1": "Giới thiệu",
@@ -11,11 +11,11 @@
   "stat3_num": "50",
   "stat3_label": "đánh giá",
   "quote_text": "câu nói yêu thích",
-  "quote_author": "Author",
+  "quote_author": "tác giả",
   "contact_address": "địa chỉ",
   "contact_phone": "Phone",
   "contact_email": "Email",
   "contact_instagram": "@ig",
-  "footer_text": "� 2026",
+  "footer_text": " 2026",
   "footer_slogan": "slogan"
 }
